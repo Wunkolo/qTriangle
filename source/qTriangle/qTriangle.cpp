@@ -6,6 +6,15 @@
 
 namespace qTri
 {
+bool EdgeTest(const qTri::Vec2& Point, const qTri::Triangle& Tri)
+{
+	// Cross-product Z component, modified for a 0,0 top-left coordiante system
+	const std::uint32_t W0 = (Point.x - Tri.B.x) * (Tri.C.y - Tri.B.y) - (Point.y - Tri.B.y) * (Tri.C.x - Tri.B.x);
+	const std::uint32_t W1 = (Point.x - Tri.B.x) * (Tri.A.y - Tri.B.y) - (Point.y - Tri.B.y) * (Tri.A.x - Tri.B.x);
+	const std::uint32_t W2 = (Point.x - Tri.A.x) * (Tri.B.y - Tri.A.y) - (Point.y - Tri.A.y) * (Tri.B.x - Tri.A.x);
+	return W0 >= 0.0f && W1 >= 0.0f && W2 >= 0.0f;
+}
+
 bool Barycentric(const qTri::Vec2& Point, const qTri::Triangle& Tri)
 {
 	const qTri::Vec2 V0 = Tri.C - Tri.A;
@@ -22,6 +31,7 @@ bool Barycentric(const qTri::Vec2& Point, const qTri::Triangle& Tri)
 	const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) * InvDenom;
 	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) * InvDenom;
 
+	// Convert to local plane's Barycentric coordiante system
 	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
 }
 }

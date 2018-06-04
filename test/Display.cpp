@@ -86,7 +86,7 @@ void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri)
 	{
 		for( std::size_t x = 0; x < Width; ++x )
 		{
-			Frame[x + y * Width] = qTri::Barycentric({x, y}, Tri) ? 1.0f : 0.0f;
+			Frame[x + y * Width] = qTri::EdgeTest({x, y}, Tri) ? 1.0f : 0.0f;
 		}
 	}
 }
