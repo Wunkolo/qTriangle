@@ -39,7 +39,7 @@ static const bool _WndV100Enabled = []() -> bool
 constexpr std::size_t Width = 80;
 constexpr std::size_t Height = 50;
 
-static qTri::Triangle Triangles[1'000];
+static qTri::Triangle Triangles[100'000];
 
 int main()
 {
