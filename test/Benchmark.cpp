@@ -82,7 +82,7 @@ int main()
 		Height
 	);
 	std::printf(
-		"Algorithm | Average per triangle(ns) | Average per triangle(ms)\n"
+		"Algorithm | Average per triangle(ns)\n"
 	);
 	// Benchmark each algorithm against all triangles
 	for( const auto& FillAlgorithm : qTri::FillAlgorithms )
@@ -103,9 +103,8 @@ int main()
 		}
 		ExecTime /= std::extent<decltype(Triangles)>::value;
 		std::printf(
-			"| %zu ns\t| %zu ms\t\n",
-			ExecTime,
-			ExecTime / 1000000
+			"| %zu ns\n",
+			ExecTime
 		);
 	}
 	return EXIT_SUCCESS;
