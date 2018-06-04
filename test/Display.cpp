@@ -82,11 +82,11 @@ void Draw(const FrameBuffer& Frame)
 	std::fputs("\033[0m", stdout);
 }
 
-bool Barycentric(const glm::u32vec2& Point, const qTri::Triangle& Tri)
+bool Barycentric(const qTri::Vec2& Point, const qTri::Triangle& Tri)
 {
-	const glm::u32vec2 V0 = Tri.C - Tri.A;
-	const glm::u32vec2 V1 = Tri.B - Tri.A;
-	const glm::u32vec2 V2 = Point - Tri.A;
+	const qTri::Vec2 V0 = Tri.C - Tri.A;
+	const qTri::Vec2 V1 = Tri.B - Tri.A;
+	const qTri::Vec2 V2 = Point - Tri.A;
 
 	const std::uint32_t Dot00 = glm::compAdd(V0 * V0);
 	const std::uint32_t Dot01 = glm::compAdd(V0 * V1);

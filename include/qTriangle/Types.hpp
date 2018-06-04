@@ -5,6 +5,9 @@
 
 namespace qTri
 {
+
+using Vec2 = glm::u32vec2;
+
 struct Triangle
 {
 	glm::u32vec2 A;
