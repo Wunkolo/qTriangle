@@ -6,12 +6,12 @@
 namespace qTri
 {
 
-using Vec2 = glm::u32vec2;
+using Vec2 = glm::i32vec2;
 
 struct Triangle
 {
-	glm::u32vec2 A;
-	glm::u32vec2 B;
-	glm::u32vec2 C;
+	glm::i32vec2 A;
+	glm::i32vec2 B;
+	glm::i32vec2 C;
 };
 }
