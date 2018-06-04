@@ -88,32 +88,34 @@ void Draw(const FrameBuffer& Frame)
 	std::fputs("\033[0m", stdout);
 }
 
-void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
+bool Barycentric(const glm::u32vec2& Point, const Triangle& Tri)
 {
 	const glm::u32vec2 V0 = Tri.C - Tri.A;
 	const glm::u32vec2 V1 = Tri.B - Tri.A;
+	const glm::u32vec2 V2 = Point - Tri.A;
 
+	const std::uint32_t Dot00 = glm::compAdd(V0 * V0);
+	const std::uint32_t Dot01 = glm::compAdd(V0 * V1);
+	const std::uint32_t Dot02 = glm::compAdd(V0 * V2);
+	const std::uint32_t Dot11 = glm::compAdd(V1 * V1);
+	const std::uint32_t Dot12 = glm::compAdd(V1 * V2);
+
+	const glm::float32_t InvDenom = 1.0f / (Dot00 * Dot11 - Dot01 * Dot01);
+	const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) * InvDenom;
+	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) * InvDenom;
+
+	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
+}
+
+void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
+{
 	for( std::size_t y = 0; y < Height; ++y )
 	{
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			const glm::u32vec2 CurPoint{x, y};
-			const glm::u32vec2 V2 = CurPoint - Tri.A;
-
-			const std::uint32_t Dot00 = glm::compAdd( V0 * V0 );
-			const std::uint32_t Dot01 = glm::compAdd( V0 * V1 );
-			const std::uint32_t Dot02 = glm::compAdd( V0 * V2 );
-			const std::uint32_t Dot11 = glm::compAdd( V1 * V1 );
-			const std::uint32_t Dot12 = glm::compAdd( V1 * V2 );
-
-			const glm::float32_t InvDenom = 1.0f / (Dot00 * Dot11 - Dot01 * Dot01);
-			const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) * InvDenom;
-			const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) * InvDenom;
-
 			if(
-				(U >= 0.0f) &&
-				(V >= 0.0f) &&
-				(U + V < 1.0f)
+				Barycentric({x, y}, Tri)
 			)
 			{
 				Frame[x + y * Width] = 1.0f;
