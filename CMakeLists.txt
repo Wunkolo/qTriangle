@@ -30,7 +30,18 @@ elseif( CMAKE_COMPILER_IS_GNUCXX )
 endif()
 
 ### Target
+
+
+
+### Tests
+enable_testing()
+
+## Display
 add_executable(
-	${PROJECT_NAME}
-	source/main.cpp
+	Display
+	test/Display.cpp
+)
+add_test(
+	NAME Display
+	COMMAND Display
 )
