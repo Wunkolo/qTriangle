@@ -1,18 +1,25 @@
 #include <qTriangle/qTriangle.hpp>
 
-
+#include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 
 namespace qTri
 {
-bool EdgeTest(const Vec2& Point, const Triangle& Tri)
+
+// Get Cross-Product Z component from two directiona vectors
+inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
+{
+	return DirA.x * DirB.y - DirA.y * DirB.x;
+}
+
+bool CrossTest(const Vec2& Point, const Triangle& Tri)
 {
 	// Cross-product Z component, modified for a 0,0 top-left coordiante system
-	const std::uint32_t W0 = (Point.x - Tri.B.x) * (Tri.C.y - Tri.B.y) - (Point.y - Tri.B.y) * (Tri.C.x - Tri.B.x);
-	const std::uint32_t W1 = (Point.x - Tri.B.x) * (Tri.A.y - Tri.B.y) - (Point.y - Tri.B.y) * (Tri.A.x - Tri.B.x);
-	const std::uint32_t W2 = (Point.x - Tri.A.x) * (Tri.B.y - Tri.A.y) - (Point.y - Tri.A.y) * (Tri.B.x - Tri.A.x);
-	return W0 >= 0.0f && W1 >= 0.0f && W2 >= 0.0f;
+	const std::int32_t W0 = CrossArea(Tri.B - Tri.A,Point - Tri.B);
+	const std::int32_t W1 = CrossArea(Tri.C - Tri.B,Point - Tri.C);
+	const std::int32_t W2 = CrossArea(Tri.A - Tri.C,Point - Tri.A);
+	return W0 >= 0 && W1 >= 0 && W2 >= 0;
 }
 
 bool Barycentric(const Vec2& Point, const Triangle& Tri)

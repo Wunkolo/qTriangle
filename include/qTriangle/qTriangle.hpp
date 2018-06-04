@@ -6,6 +6,6 @@
 
 namespace qTri
 {
-bool EdgeTest(const qTri::Vec2& Point, const qTri::Triangle& Tri);
+bool CrossTest(const qTri::Vec2& Point, const qTri::Triangle& Tri);
 bool Barycentric(const qTri::Vec2& Point, const qTri::Triangle& Tri);
 }
