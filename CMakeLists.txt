@@ -30,8 +30,11 @@ elseif( CMAKE_COMPILER_IS_GNUCXX )
 endif()
 
 ### Target
-
-
+add_library(
+	qTriangle
+	STATIC
+	source/qTriangle/qTriangle.cpp
+)
 
 ### Tests
 enable_testing()
