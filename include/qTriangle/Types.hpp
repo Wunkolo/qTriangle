@@ -26,8 +26,6 @@ using Vec2 = glm::i32vec2;
 
 struct Triangle
 {
-	glm::i32vec2 A;
-	glm::i32vec2 B;
-	glm::i32vec2 C;
+	glm::i32vec2 Vert[3];
 };
 }
