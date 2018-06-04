@@ -44,14 +44,25 @@ void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri);
 int main()
 {
 	FrameBuffer CurFrame = {};
-	FillTriangle(
-		CurFrame,
+	const qTri::Triangle Triangles[] = {
+		{
+			{Width, 0},
+			{Width, Height / 2},
+			{0, Height}
+		},
 		{
 			{0, 0},
 			{Width, Height / 2},
 			{Width / 2, Height}
-		}
-	);
+		},
+	};
+	for( std::size_t i = 0; i < std::extent<decltype(Triangles)>::value; ++i )
+	{
+		FillTriangle(
+			CurFrame,
+			Triangles[i]
+		);
+	}
 	Draw(CurFrame);
 
 	return EXIT_SUCCESS;
@@ -87,7 +98,7 @@ void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri)
 			++x
 		)
 		{
-			Frame[x + y * Width] = qTri::CrossTest({x, y}, Tri);
+			Frame[x + y * Width] |= qTri::CrossTest({x, y}, Tri);
 		}
 	}
 }
