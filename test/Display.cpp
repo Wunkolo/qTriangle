@@ -6,9 +6,33 @@
 
 #include <glm/glm.hpp>
 
+#ifdef _WIN32
+#include <Windows.h>
+// Statically enables "ENABLE_VIRTUAL_TERMINAL_PROCESSING" for the terminal
+// at runtime to allow for unix-style escape sequences. 
+const static bool _WndV100Enabled = []() -> bool
+	{
+		const auto Handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		DWORD ConsoleMode;
+		GetConsoleMode(
+			Handle,
+			&ConsoleMode
+		);
+		SetConsoleMode(
+			Handle,
+			ConsoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+		);
+		GetConsoleMode(
+			Handle,
+			&ConsoleMode
+		);
+		return ConsoleMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	}();
+#endif
+
 constexpr std::size_t Width = 80;
 constexpr std::size_t Height = 50;
-using FrameBuffer = std::array< glm::float32_t, Width * Height >;
+using FrameBuffer = std::array<glm::float32_t, Width * Height>;
 
 struct Triangle
 {
@@ -18,8 +42,8 @@ struct Triangle
 	glm::u64vec2 C;
 };
 
-void Draw( const FrameBuffer& Frame );
-void FillTriangle( FrameBuffer& Frame, const Triangle& Tri );
+void Draw(const FrameBuffer& Frame);
+void FillTriangle(FrameBuffer& Frame, const Triangle& Tri);
 
 int main()
 {
@@ -27,42 +51,42 @@ int main()
 	FillTriangle(
 		CurFrame,
 		{
-			{       0,        0 },
-			{   Width, Height/2 },
-			{ Width/2,   Height }
+			{0, 0},
+			{Width, Height / 2},
+			{Width / 2, Height}
 		}
 	);
-	Draw( CurFrame );
+	Draw(CurFrame);
 
 	return EXIT_SUCCESS;
 }
 
-void Draw( const FrameBuffer& Frame )
+void Draw(const FrameBuffer& Frame)
 {
 	static constexpr char Shades[] = " .:*oe&#%@";
 	for( std::size_t y = 0; y < Height; ++y )
 	{
-		std::fputs( "\e[0;35m|\e[0;36m", stdout );
+		std::fputs("\033[0;35m|\033[1;36m", stdout);
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			std::putchar(
 				Shades[
 					static_cast<std::size_t>(
 						glm::clamp(
-							Frame[ x + y * Width ],
+							Frame[x + y * Width],
 							0.0f,
 							1.0f
-						) * ( std::extent<decltype(Shades)>::value - 2 )
+						) * (std::extent<decltype(Shades)>::value - 2)
 					)
 				]
 			);
 		}
-		std::fputs( "\e[0;35m|\n", stdout );
+		std::fputs("\033[0;35m|\n", stdout);
 	}
-	std::fputs( "\e[0m", stdout );
+	std::fputs("\033[0m", stdout);
 }
 
-void FillTriangle( FrameBuffer& Frame, const Triangle& Tri )
+void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
 {
 	const glm::u64vec2 V0 = Tri.C - Tri.A;
 	const glm::u64vec2 V1 = Tri.B - Tri.A;
@@ -71,7 +95,7 @@ void FillTriangle( FrameBuffer& Frame, const Triangle& Tri )
 	{
 		for( std::size_t x = 0; x < Width; ++x )
 		{
-			const glm::u64vec2 CurPoint{ x, y };
+			const glm::u64vec2 CurPoint{x, y};
 			const glm::u64vec2 V2 = CurPoint - Tri.A;
 
 			const std::uint64_t Dot00 = V0.x * V0.x + V0.y * V0.y;
@@ -90,7 +114,7 @@ void FillTriangle( FrameBuffer& Frame, const Triangle& Tri )
 				(U + V < 1.0)
 			)
 			{
-				Frame[x + y * Width ] = 1.0f;
+				Frame[x + y * Width] = 1.0f;
 			}
 		}
 	}
