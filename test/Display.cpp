@@ -5,6 +5,8 @@
 #include <array>
 
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/component_wise.hpp>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -98,11 +100,11 @@ void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
 			const glm::u32vec2 CurPoint{x, y};
 			const glm::u32vec2 V2 = CurPoint - Tri.A;
 
-			const std::uint32_t Dot00 = V0.x * V0.x + V0.y * V0.y;
-			const std::uint32_t Dot01 = V0.x * V1.x + V0.y * V1.y;
-			const std::uint32_t Dot02 = V0.x * V2.x + V0.y * V2.y;
-			const std::uint32_t Dot11 = V1.x * V1.x + V1.y * V1.y;
-			const std::uint32_t Dot12 = V1.x * V2.x + V1.y * V2.y;
+			const std::uint32_t Dot00 = glm::compAdd( V0 * V0 );
+			const std::uint32_t Dot01 = glm::compAdd( V0 * V1 );
+			const std::uint32_t Dot02 = glm::compAdd( V0 * V2 );
+			const std::uint32_t Dot11 = glm::compAdd( V1 * V1 );
+			const std::uint32_t Dot12 = glm::compAdd( V1 * V2 );
 
 			const glm::float32_t InvDenom = 1.0f / (Dot00 * Dot11 - Dot01 * Dot01);
 			const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) * InvDenom;
