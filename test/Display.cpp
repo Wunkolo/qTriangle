@@ -79,7 +79,7 @@ void Draw(const FrameBuffer& Frame)
 							0.0f,
 							1.0f
 						) * (std::extent<decltype(Shades)>::value - 2)
-					) 
+					)
 				]
 			);
 		}
@@ -114,12 +114,7 @@ void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			const glm::u32vec2 CurPoint{x, y};
-			if(
-				Barycentric({x, y}, Tri)
-			)
-			{
-				Frame[x + y * Width] = 1.0f;
-			}
+			Frame[x + y * Width] = Barycentric({x, y}, Tri) ? 1.0f : 0.0f;
 		}
 	}
 }
