@@ -35,6 +35,7 @@ add_library(
 	qTriangle
 	STATIC
 	source/qTriangle/qTriangle.cpp
+	source/qTriangle/Util.cpp
 )
 
 ### Tests
@@ -53,4 +54,19 @@ target_link_libraries(
 add_test(
 	NAME Display
 	COMMAND Display
+)
+
+## Benchmark
+add_executable(
+	Benchmark
+	test/Benchmark.cpp
+)
+target_link_libraries(
+	Benchmark
+	PRIVATE
+	qTriangle
+)
+add_test(
+	NAME Benchmark
+	COMMAND Benchmark
 )

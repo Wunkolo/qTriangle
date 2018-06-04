@@ -41,4 +41,34 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 	// Convert to local plane's Barycentric coordiante system
 	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
 }
+
+template< bool TestFunc(const qTri::Vec2& Point, const qTri::Triangle& Tri) >
+void SerialBlit(qTri::Image& Frame, const qTri::Triangle& Tri)
+{
+	const auto XBounds = std::minmax({Tri.A.x, Tri.B.x, Tri.C.x});
+	const auto YBounds = std::minmax({Tri.A.y, Tri.B.y, Tri.C.y});
+	for(
+		std::size_t y = std::min<std::size_t>(YBounds.first, 0);
+		y < std::max<std::size_t>(YBounds.second, Frame.Height);
+		++y
+	)
+	{
+		for(
+			std::size_t x = std::min<std::size_t>(XBounds.first, 0);
+			x < std::max<std::size_t>(XBounds.second, Frame.Width);
+			++x
+		)
+		{
+			Frame.Pixels[x + y * Frame.Width] = (TestFunc({x, y}, Tri) | Frame.Pixels[x + y * Frame.Width]);
+		}
+	}
+}
+
+const std::pair<
+	void(*)(qTri::Image& Frame, const qTri::Triangle& Tri),
+	const char*
+> FillAlgorithms[2] = {
+	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
+	{SerialBlit<Barycentric>, "Serial-Barycentric"}
+};
 }
