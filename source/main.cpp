@@ -27,9 +27,9 @@ int main()
 	FillTriangle(
 		CurFrame,
 		{
-			{       0,         0 },
-			{   Width,  Height/2 },
-			{ Width/2,    Height }
+			{       0,        0 },
+			{   Width, Height/2 },
+			{ Width/2,   Height }
 		}
 	);
 	Draw( CurFrame );
@@ -42,7 +42,7 @@ void Draw( const FrameBuffer& Frame )
 	static constexpr char Shades[] = " .:*oe&#%@";
 	for( std::size_t y = 0; y < Height; ++y )
 	{
-		std::putchar('|');
+		std::fputs( "\e[0;35m|\e[0;36m", stdout );
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			std::putchar(
@@ -57,8 +57,9 @@ void Draw( const FrameBuffer& Frame )
 				]
 			);
 		}
-		std::puts("|");
+		std::fputs( "\e[0;35m|\n", stdout );
 	}
+	std::fputs( "\e[0m", stdout );
 }
 
 void FillTriangle( FrameBuffer& Frame, const Triangle& Tri )
