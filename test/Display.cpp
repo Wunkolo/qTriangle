@@ -78,8 +78,8 @@ void Draw(const FrameBuffer& Frame)
 							Frame[x + y * Width],
 							0.0f,
 							1.0f
-						) * (std::extent<decltype(Shades)>::value - 1)
-					) - 1
+						) * (std::extent<decltype(Shades)>::value - 2)
+					) 
 				]
 			);
 		}
