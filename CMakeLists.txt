@@ -45,6 +45,11 @@ add_executable(
 	Display
 	test/Display.cpp
 )
+target_link_libraries(
+	Display
+	PRIVATE
+	qTriangle
+)
 add_test(
 	NAME Display
 	COMMAND Display

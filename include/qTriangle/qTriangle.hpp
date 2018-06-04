@@ -6,5 +6,5 @@
 
 namespace qTri
 {
-
+bool Barycentric(const qTri::Vec2& Point, const qTri::Triangle& Tri);
 }
