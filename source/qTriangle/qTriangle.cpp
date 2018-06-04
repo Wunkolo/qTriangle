@@ -35,9 +35,9 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 	const std::uint32_t Dot11 = glm::compAdd(V1 * V1);
 	const std::uint32_t Dot12 = glm::compAdd(V1 * V2);
 
-	const glm::float32_t InvDenom = 1.0f / (Dot00 * Dot11 - Dot01 * Dot01);
-	const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) * InvDenom;
-	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) * InvDenom;
+	const glm::float32_t Det = (Dot00 * Dot11 - Dot01 * Dot01);
+	const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) / Det;
+	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
 
 	// Convert to local plane's Barycentric coordiante system
 	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
