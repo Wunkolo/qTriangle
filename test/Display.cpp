@@ -9,6 +9,7 @@
 #include <qTriangle/qTriangle.hpp>
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <Windows.h>
 // Statically enables "ENABLE_VIRTUAL_TERMINAL_PROCESSING" for the terminal
 // at runtime to allow for unix-style escape sequences. 
@@ -73,9 +74,15 @@ void Draw(const FrameBuffer& Frame)
 
 void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri)
 {
-	for( std::size_t y = 0; y < Height; ++y )
+	for( std::size_t y = std::min<std::size_t>(std::min({Tri.A.y, Tri.B.y, Tri.C.y}), 0);
+		y < std::max<std::size_t>(std::max({Tri.A.y, Tri.B.y, Tri.C.y}), Height);
+		++y
+	)
 	{
-		for( std::size_t x = 0; x < Width; ++x )
+		for( std::size_t x = std::min<std::size_t>(std::min({Tri.A.x, Tri.B.x, Tri.C.x}), 0);
+			x < std::max<std::size_t>(std::max({Tri.A.x, Tri.B.x, Tri.C.x}), Width);
+			++x
+		)
 		{
 			Frame[x + y * Width] = qTri::CrossTest({x, y}, Tri);
 		}
