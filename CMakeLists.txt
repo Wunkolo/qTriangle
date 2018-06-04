@@ -16,6 +16,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 ### Global includes
 include_directories(
 	include
+	extern/glm
 )
 
 ### Optimizations
