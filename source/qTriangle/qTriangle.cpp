@@ -6,20 +6,20 @@
 
 namespace qTri
 {
-
 // Get Cross-Product Z component from two directiona vectors
 inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
 {
 	return DirA.x * DirB.y - DirA.y * DirB.x;
 }
 
+// Cross-product test against each edge, ensuring the area
+// of each parallelogram is positive
 bool CrossTest(const Vec2& Point, const Triangle& Tri)
 {
-	// Cross-product Z component, modified for a 0,0 top-left coordiante system
-	const std::int32_t W0 = CrossArea(Tri.B - Tri.A,Point - Tri.B);
-	const std::int32_t W1 = CrossArea(Tri.C - Tri.B,Point - Tri.C);
-	const std::int32_t W2 = CrossArea(Tri.A - Tri.C,Point - Tri.A);
-	return W0 >= 0 && W1 >= 0 && W2 >= 0;
+	return
+		CrossArea(Tri.B - Tri.A, Point - Tri.B) >= 0 &&
+		CrossArea(Tri.C - Tri.B, Point - Tri.C) >= 0 &&
+		CrossArea(Tri.A - Tri.C, Point - Tri.A) >= 0;
 }
 
 bool Barycentric(const Vec2& Point, const Triangle& Tri)
