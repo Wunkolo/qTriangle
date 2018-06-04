@@ -34,7 +34,7 @@ const static bool _WndV100Enabled = []() -> bool
 
 constexpr std::size_t Width = 80;
 constexpr std::size_t Height = 50;
-using FrameBuffer = std::array<glm::float32_t, Width * Height>;
+using FrameBuffer = std::array<bool, Width * Height>;
 
 void Draw(const FrameBuffer& Frame);
 void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri);
@@ -57,22 +57,13 @@ int main()
 
 void Draw(const FrameBuffer& Frame)
 {
-	static constexpr char Shades[] = " .:*oe&#%@";
 	for( std::size_t y = 0; y < Height; ++y )
 	{
 		std::fputs("\033[0;35m|\033[1;36m", stdout);
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			std::putchar(
-				Shades[
-					static_cast<std::size_t>(
-						glm::clamp(
-							Frame[x + y * Width],
-							0.0f,
-							1.0f
-						) * (std::extent<decltype(Shades)>::value - 2)
-					)
-				]
+				" @"[Frame[x + y * Width]]
 			);
 		}
 		std::fputs("\033[0;35m|\n", stdout);
@@ -86,7 +77,7 @@ void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri)
 	{
 		for( std::size_t x = 0; x < Width; ++x )
 		{
-			Frame[x + y * Width] = qTri::EdgeTest({x, y}, Tri) ? 1.0f : 0.0f;
+			Frame[x + y * Width] = qTri::CrossTest({x, y}, Tri);
 		}
 	}
 }
