@@ -8,6 +8,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 
+#include <qTriangle/qTriangle.hpp>
+
 #ifdef _WIN32
 #include <Windows.h>
 // Statically enables "ENABLE_VIRTUAL_TERMINAL_PROCESSING" for the terminal
@@ -36,16 +38,8 @@ constexpr std::size_t Width = 80;
 constexpr std::size_t Height = 50;
 using FrameBuffer = std::array<glm::float32_t, Width * Height>;
 
-struct Triangle
-{
-	// Clock-wise order
-	glm::u32vec2 A;
-	glm::u32vec2 B;
-	glm::u32vec2 C;
-};
-
 void Draw(const FrameBuffer& Frame);
-void FillTriangle(FrameBuffer& Frame, const Triangle& Tri);
+void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri);
 
 int main()
 {
@@ -88,7 +82,7 @@ void Draw(const FrameBuffer& Frame)
 	std::fputs("\033[0m", stdout);
 }
 
-bool Barycentric(const glm::u32vec2& Point, const Triangle& Tri)
+bool Barycentric(const glm::u32vec2& Point, const qTri::Triangle& Tri)
 {
 	const glm::u32vec2 V0 = Tri.C - Tri.A;
 	const glm::u32vec2 V1 = Tri.B - Tri.A;
@@ -107,7 +101,7 @@ bool Barycentric(const glm::u32vec2& Point, const Triangle& Tri)
 	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
 }
 
-void FillTriangle(FrameBuffer& Frame, const Triangle& Tri)
+void FillTriangle(FrameBuffer& Frame, const qTri::Triangle& Tri)
 {
 	for( std::size_t y = 0; y < Height; ++y )
 	{
