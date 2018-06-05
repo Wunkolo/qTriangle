@@ -23,6 +23,7 @@ include_directories(
 if( MSVC )
 	add_compile_options( /arch:AVX2 )
 	add_compile_options( /W3 )
+	add_compile_options( /Gv )
 elseif( CMAKE_COMPILER_IS_GNUCXX )
 	add_compile_options( -march=native )
 	add_compile_options( -Ofast )
