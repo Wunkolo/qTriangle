@@ -47,7 +47,7 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 			const bool Inside = CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
 				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
 				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
-			Frame.Pixels[x + y * Frame.Width] = Inside | Frame.Pixels[x + y * Frame.Width];
+			Frame.Pixels[x + y * Frame.Width] |= Inside;
 		}
 	}
 }
@@ -105,8 +105,7 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 			const std::uint32_t Dot12 = glm::compAdd(V1 * V2);
 			const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) / Det;
 			const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
-			Frame.Pixels[x + y * Frame.Width] = ((U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f)) | Frame.Pixels[x + y * Frame.Width
-			];
+			Frame.Pixels[x + y * Frame.Width] |= ((U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f));
 		}
 	}
 }
@@ -128,7 +127,7 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 			++x
 		)
 		{
-			Frame.Pixels[x + y * Frame.Width] = (TestFunc({x, y}, Tri) | Frame.Pixels[x + y * Frame.Width]);
+			Frame.Pixels[x + y * Frame.Width] |= TestFunc({x, y}, Tri);;
 		}
 	}
 }

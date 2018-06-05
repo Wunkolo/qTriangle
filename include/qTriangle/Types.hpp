@@ -19,7 +19,7 @@ public:
 
 	std::size_t Width;
 	std::size_t Height;
-	std::vector<bool> Pixels;
+	std::vector<std::uint8_t> Pixels;
 };
 
 using Vec2 = glm::i32vec2;
