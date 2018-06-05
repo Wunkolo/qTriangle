@@ -24,7 +24,7 @@ public:
 
 using Vec2 = glm::i32vec2;
 
-struct Triangle
+struct alignas(16) Triangle
 {
 	glm::i32vec2 Vert[3];
 };
