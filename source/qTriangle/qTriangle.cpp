@@ -23,7 +23,7 @@ bool CrossTest(const Vec2& Point, const Triangle& Tri)
 		CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]) >= 0;
 }
 
-void CrossFill(qTri::Image& Frame, const qTri::Triangle& Tri)
+void CrossFill(Image& Frame, const Triangle& Tri)
 {
 	const Vec2 DirectionBA = Tri.Vert[1] - Tri.Vert[0];
 	const Vec2 DirectionCB = Tri.Vert[2] - Tri.Vert[1];
@@ -74,7 +74,7 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 
 // With this method:
 //  Only V2,Dot02,Dot12,U, and V have to be re-generated for each vertex
-void BarycentricFill(qTri::Image& Frame, const qTri::Triangle& Tri)
+void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
 	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
 	const Vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
@@ -111,8 +111,8 @@ void BarycentricFill(qTri::Image& Frame, const qTri::Triangle& Tri)
 	}
 }
 
-template< bool TestFunc(const qTri::Vec2& Point, const qTri::Triangle& Tri) >
-void SerialBlit(qTri::Image& Frame, const qTri::Triangle& Tri)
+template< bool TestFunc(const Vec2& Point, const Triangle& Tri) >
+void SerialBlit(Image& Frame, const Triangle& Tri)
 {
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
@@ -134,7 +134,7 @@ void SerialBlit(qTri::Image& Frame, const qTri::Triangle& Tri)
 }
 
 const std::pair<
-	void(*)(qTri::Image& Frame, const qTri::Triangle& Tri),
+	void(*)(Image& Frame, const Triangle& Tri),
 	const char*
 > FillAlgorithms[4] = {
 	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
