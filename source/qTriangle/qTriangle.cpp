@@ -23,6 +23,35 @@ bool CrossTest(const Vec2& Point, const Triangle& Tri)
 		CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]) >= 0;
 }
 
+void CrossFill(qTri::Image& Frame, const qTri::Triangle& Tri)
+{
+	const Vec2 DirectionBA = Tri.Vert[1] - Tri.Vert[0];
+	const Vec2 DirectionCB = Tri.Vert[2] - Tri.Vert[1];
+	const Vec2 DirectionAC = Tri.Vert[0] - Tri.Vert[2];
+
+	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
+	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	for(
+		std::size_t y = std::min<std::size_t>(YBounds.first, 0);
+		y < std::max<std::size_t>(YBounds.second, Frame.Height);
+		++y
+	)
+	{
+		for(
+			std::size_t x = std::min<std::size_t>(XBounds.first, 0);
+			x < std::max<std::size_t>(XBounds.second, Frame.Width);
+			++x
+		)
+		{
+			const Vec2 CurPoint{x, y};
+			const bool Inside = CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
+				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
+				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
+			Frame.Pixels[x + y * Frame.Width] = Inside | Frame.Pixels[x + y * Frame.Width];
+		}
+	}
+}
+
 bool Barycentric(const Vec2& Point, const Triangle& Tri)
 {
 	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
@@ -107,9 +136,10 @@ void SerialBlit(qTri::Image& Frame, const qTri::Triangle& Tri)
 const std::pair<
 	void(*)(qTri::Image& Frame, const qTri::Triangle& Tri),
 	const char*
-> FillAlgorithms[3] = {
+> FillAlgorithms[4] = {
 	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
 	{SerialBlit<Barycentric>, "Serial-Barycentric"},
+	{CrossFill, "Serial-CrossProductFill"},
 	{BarycentricFill, "Serial-BarycentricFill"}
 };
 }
