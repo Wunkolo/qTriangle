@@ -26,6 +26,6 @@ using Vec2 = glm::i32vec2;
 
 struct alignas(16) Triangle
 {
-	glm::i32vec2 Vert[3];
+	Vec2 Vert[3];
 };
 }
