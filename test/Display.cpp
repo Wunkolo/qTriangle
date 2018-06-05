@@ -94,9 +94,8 @@ int main()
 		}
 		ExecTime /= std::extent<decltype(Triangles)>::value;
 		std::printf(
-			"%zu ns | %zu ms\n",
-			ExecTime,
-			ExecTime / 1000000
+			"%zu ns\n",
+			ExecTime
 		);
 		qTri::Util::Draw(CurFrame);
 	}
