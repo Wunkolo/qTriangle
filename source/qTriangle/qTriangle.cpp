@@ -81,7 +81,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		// Rasterize Scanline
 		for( std::size_t x = 0; x < Width; ++x )
 		{
-			const __m256i PointDir = _mm256_sub_epi64(
+			const __m256i PointDir = _mm256_sub_epi32(
 				CurPoint,
 				TriVerts120
 			);
