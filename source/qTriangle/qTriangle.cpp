@@ -4,6 +4,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 
+#include <immintrin.h>
+
 namespace qTri
 {
 // Get Cross-Product Z component from two directiona vectors
@@ -47,6 +49,117 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 			const bool Inside = CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
 				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
 				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
+			Frame.Pixels[x + y * Frame.Width] |= Inside;
+		}
+	}
+}
+
+inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
+{
+	/*
+		   A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
+		*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
+		-----------------------------------------
+	*/
+	auto Cross = _mm256_mullo_epi32(
+		VertsA,
+		_mm256_shuffle_epi32(
+			VertsB,
+			_MM_SHUFFLE(2,3,0,1)
+		)
+	);
+	/*
+		Upper: ~ | ~ | ~ | C2 | ~ | C1 | ~ | C0
+	*/
+	__m128i Upper = _mm256_castsi256_si128(
+		_mm256_permutevar8x32_epi32(
+			Cross,
+			_mm256_set_epi32(
+				-1,
+				-1,
+				-1,
+				-1,
+				-1,
+				4,
+				2,
+				0
+			)
+		)
+	);
+	/*
+		Lower: ~ | ~ | C5 | ~ | C3 | ~ | C1 | ~
+	*/
+	__m128i Lower = _mm256_castsi256_si128(
+		_mm256_permutevar8x32_epi32(
+			Cross,
+			_mm256_set_epi32(
+				-1,
+				-1,
+				-1,
+				-1,
+				-1,
+				5,
+				3,
+				1
+			)
+		)
+	);
+	return _mm_sub_epi32(
+		Upper,
+		Lower
+	);
+}
+
+void CrossFillAVX2(Image& Frame, const Triangle& Tri)
+{
+	const __m256i TriVerts012 = _mm256_maskload_epi64(
+		reinterpret_cast<const std::int64_t*>(&Tri.Vert),
+		_mm256_set_epi64x(0, -1, -1, -1)
+	);
+	const __m256i TriVerts120 = _mm256_permute4x64_epi64(
+		TriVerts012,
+		_MM_SHUFFLE(3,0,2,1)
+	);
+	const __m256i TriDirections = _mm256_sub_epi64(
+		TriVerts120,
+		TriVerts012
+	);
+	const Vec2 DirectionBA = Tri.Vert[1] - Tri.Vert[0];
+	const Vec2 DirectionCB = Tri.Vert[2] - Tri.Vert[1];
+	const Vec2 DirectionAC = Tri.Vert[0] - Tri.Vert[2];
+
+	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
+	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	for(
+		std::size_t y = std::min<std::size_t>(YBounds.first, 0);
+		y < std::max<std::size_t>(YBounds.second, Frame.Height);
+		++y
+	)
+	{
+		for(
+			std::size_t x = std::min<std::size_t>(XBounds.first, 0);
+			x < std::max<std::size_t>(XBounds.second, Frame.Width);
+			++x
+		)
+		{
+			const Vec2 CurPoint{x, y};
+			const __m256i PointDir = _mm256_sub_epi64(
+				_mm256_broadcastq_epi64(
+					_mm_maskload_epi64(
+						reinterpret_cast<const std::int64_t*>(&CurPoint),
+						_mm_set_epi64x(0, -1)
+					)
+				),
+				TriVerts120
+			);
+			const __m128i Crosses = _mm_cmplt_epi32(
+				CrossAreaAVX2(
+					TriDirections,
+					PointDir
+				),
+				_mm_setzero_si128()
+			);
+			const auto Inside = _mm_test_all_zeros(Crosses,_mm_set1_epi32(-1));
 			Frame.Pixels[x + y * Frame.Width] |= Inside;
 		}
 	}
@@ -135,10 +248,11 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 const std::pair<
 	void(*)(Image& Frame, const Triangle& Tri),
 	const char*
-> FillAlgorithms[4] = {
+> FillAlgorithms[5] = {
 	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
 	{SerialBlit<Barycentric>, "Serial-Barycentric"},
 	{CrossFill, "Serial-CrossProductFill"},
+	{CrossFillAVX2, "Serial-CrossProductFillAVX2"},
 	{BarycentricFill, "Serial-BarycentricFill"}
 };
 }

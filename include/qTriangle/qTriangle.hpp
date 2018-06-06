@@ -12,5 +12,5 @@ namespace qTri
 extern const std::pair<
 	void(*)(qTri::Image& Frame, const qTri::Triangle& Tri),
 	const char*
-> FillAlgorithms[4];
+> FillAlgorithms[5];
 }
