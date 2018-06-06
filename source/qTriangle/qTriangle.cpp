@@ -61,7 +61,7 @@ inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
 		*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
 		-----------------------------------------
 	*/
-	auto Cross = _mm256_mullo_epi32(
+	const __m256i Cross = _mm256_mullo_epi32(
 		VertsA,
 		_mm256_shuffle_epi32(
 			VertsB,
@@ -71,7 +71,7 @@ inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
 	/*
 		Upper: ~ | ~ | ~ | C2 | ~ | C1 | ~ | C0
 	*/
-	__m128i Upper = _mm256_castsi256_si128(
+	const __m128i Upper = _mm256_castsi256_si128(
 		_mm256_permutevar8x32_epi32(
 			Cross,
 			_mm256_set_epi32(
@@ -89,7 +89,7 @@ inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
 	/*
 		Lower: ~ | ~ | C5 | ~ | C3 | ~ | C1 | ~
 	*/
-	__m128i Lower = _mm256_castsi256_si128(
+	const __m128i Lower = _mm256_castsi256_si128(
 		_mm256_permutevar8x32_epi32(
 			Cross,
 			_mm256_set_epi32(
@@ -124,9 +124,6 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		TriVerts120,
 		TriVerts012
 	);
-	const Vec2 DirectionBA = Tri.Vert[1] - Tri.Vert[0];
-	const Vec2 DirectionCB = Tri.Vert[2] - Tri.Vert[1];
-	const Vec2 DirectionAC = Tri.Vert[0] - Tri.Vert[2];
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
@@ -142,13 +139,9 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			++x
 		)
 		{
-			const Vec2 CurPoint{x, y};
 			const __m256i PointDir = _mm256_sub_epi64(
-				_mm256_broadcastq_epi64(
-					_mm_maskload_epi64(
-						reinterpret_cast<const std::int64_t*>(&CurPoint),
-						_mm_set_epi64x(0, -1)
-					)
+				_mm256_set1_epi64x(
+					(static_cast<std::int64_t>(y) << 32) | x
 				),
 				TriVerts120
 			);
@@ -159,8 +152,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				),
 				_mm_setzero_si128()
 			);
-			const auto Inside = _mm_test_all_zeros(Crosses,_mm_set1_epi32(-1));
-			Frame.Pixels[x + y * Frame.Width] |= Inside;
+			Frame.Pixels[x + y * Frame.Width] |= _mm_test_all_zeros(Crosses, _mm_set1_epi32(-1));
 		}
 	}
 }
