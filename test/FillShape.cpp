@@ -41,17 +41,23 @@ static const bool _WndV100Enabled = []() -> bool
 	}();
 #endif
 
-constexpr std::size_t Width = 80;
-constexpr std::size_t Height = 80;
+constexpr std::size_t Width = 200;
+constexpr std::size_t Height = 250;
 
 int main()
 {
 	// Simple Square
 	const qTri::Vec2 Edges[] = {
-		qTri::Vec2{10, 10},
-		qTri::Vec2{70, 10},
-		qTri::Vec2{70, 70},
-		qTri::Vec2{10, 70}
+		qTri::Vec2{120, 110},
+		qTri::Vec2{130, 140},
+		qTri::Vec2{160, 140},
+		qTri::Vec2{140, 160},
+		qTri::Vec2{150, 190},
+		qTri::Vec2{120, 170},
+		qTri::Vec2{ 90, 190},
+		qTri::Vec2{100, 160},
+		qTri::Vec2{ 80, 140},
+		qTri::Vec2{110, 140}
 	};
 
 	qTri::Triangle Triangles[std::extent<decltype(Edges)>::value];
