@@ -48,19 +48,24 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 
 void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 {
+	// Load triangle vertices (assumed clockwise order)
 	const __m256i TriVerts012 = _mm256_maskload_epi64(
 		reinterpret_cast<const long long int*>(&Tri.Vert),
 		_mm256_set_epi64x(0, -1, -1, -1)
 	);
+	// Rotate vertex components
 	const __m256i TriVerts120 = _mm256_permute4x64_epi64(
 		TriVerts012,
 		_MM_SHUFFLE(3, 0, 2, 1)
 	);
+	// Directional vectors such that each triangle vertex is pointing to
+	// the vertex before it, in counter-clockwise order
 	const __m256i TriDirections = _mm256_sub_epi64(
 		TriVerts120,
 		TriVerts012
 	);
 
+	// Iterate through triangle bounds
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
 	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
@@ -69,53 +74,55 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
 	for( std::size_t y = 0; y < Height; ++y )
 	{
+		// Left-most point of current scanline
 		__m256i CurPoint = _mm256_set1_epi64x(
 			(static_cast<std::uint64_t>(YBounds.first + y) << 32) | static_cast<std::uint32_t>(XBounds.first)
 		);
+		// Rasterize Scanline
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			const __m256i PointDir = _mm256_sub_epi64(
 				CurPoint,
 				TriVerts120
 			);
-			// DirA.x * DirB.y - DirA.y * DirB.x;
-			// A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
-			// B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
+			// Compute Z-components of cross products in parallel
+			// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
+			// values at once
+
+			// Swap XY Values of Vector B's elements (int32_t)
+			// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
+			// B: [ ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0 ]
 			const __m256i Product = _mm256_mullo_epi32(
 				TriDirections,
+				// Shuffles the two 128-bit lanes
 				_mm256_shuffle_epi32(
 					PointDir,
 					_MM_SHUFFLE(2, 3, 0, 1)
 				)
 			);
-			// Shift lower values into appropriate value
+			// Shift Y values into X value columns
 			const __m256i Lower = _mm256_srli_epi64(
 				Product,
 				32
 			);
-			// Perform subtraction and extract results
-			const __m256i Crosses = _mm256_blend_epi32(
-				_mm256_setzero_si256(),
-				_mm256_sub_epi32(
-					Product,
-					Lower
-				),
-				0b00010101
+			// Get Z component of cross product
+			const __m256i CrossAreas = _mm256_sub_epi32(
+				Product,
+				Lower
 			);
-			// Extract sign bit to test ( X >= 0 )
-			Dest[x + y * Frame.Width] |= _mm256_testz_si256(
-				Crosses,
-				_mm256_set1_epi32(1 << 31)
-			);
-			// Get next X coordinate
-			CurPoint = _mm256_add_epi64(
-				CurPoint,
-				_mm256_set_epi64x(
-					0,
-					1,
-					0,
-					1
+			// Check if `X >= 0` for each of the 3 Z-components
+			// ( x >= 0 ) ⇒ ¬( X < 0 )
+			Dest[x + y * Frame.Width] |= _mm256_test_all_zeros(
+				_mm256_set_epi32( 0, 0, 0, -1, 0, -1, 0, -1 ),
+				_mm256_cmpgt_epi32(
+					_mm256_setzero_si256(),
+					CrossAreas
 				)
+			);
+			// Increment to next sample coordinate
+			CurPoint = _mm256_add_epi32(
+				CurPoint,
+				_mm256_set1_epi64x( 1 )
 			);
 		}
 	}
