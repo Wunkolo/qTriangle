@@ -61,28 +61,19 @@ inline __m256i CrossAreasAVX2(const __m256i VertsA, const __m256i VertsB)
 			_MM_SHUFFLE(2, 3, 0, 1)
 		)
 	);
-	/*
-		Upper: ~ | ~ | ~ | C2 | ~ | C1 | ~ | C0
-	*/
-	const __m256i Upper = _mm256_blend_epi32(
-		_mm256_setzero_si256(),
-		Dot,
-		0b00010101
-	);
-	/*
-		Lower: ~ | ~ | C5 | ~ | C3 | ~ | C1 | ~
-	*/
+	// Shift lower values into appropriate value
 	const __m256i Lower = _mm256_srli_epi64(
-		_mm256_blend_epi32(
-			_mm256_setzero_si256(),
-			Dot,
-			0b00101010
-		),
+		Dot,
 		32
 	);
-	return _mm256_sub_epi32(
-		Upper,
-		Lower
+	// Perform subtraction and extract results
+	return _mm256_blend_epi32(
+		_mm256_setzero_si256(),
+		_mm256_sub_epi32(
+			Dot,
+			Lower
+		),
+		0b00010101
 	);
 }
 
@@ -114,12 +105,12 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				TriVerts120
 			);
 			const __m256i Crosses = CrossAreasAVX2(
-					TriDirections,
-					PointDir
-				);
+				TriDirections,
+				PointDir
+			);
 			Frame.Pixels[x + y * Frame.Width] |= _mm256_testz_si256(
 				Crosses,
-				_mm256_set1_epi32(0b10000000000000000000000000000000)
+				_mm256_set1_epi32(1 << 32)
 			);
 		}
 	}
