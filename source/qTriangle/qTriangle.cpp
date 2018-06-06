@@ -63,22 +63,24 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::size_t y = YBounds.first; y < YBounds.second; ++y )
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	for( std::size_t y = 0; y < Height; ++y )
 	{
-		for( std::size_t x = XBounds.first; x < XBounds.second; ++x )
+		__m256i CurPoint = _mm256_set1_epi64x(
+			(static_cast<std::uint64_t>(YBounds.first + y) << 32) | static_cast<std::uint32_t>(XBounds.first)
+		);
+		for( std::size_t x = 0; x < Width; ++x )
 		{
 			const __m256i PointDir = _mm256_sub_epi64(
-				_mm256_set1_epi64x(
-					(static_cast<std::uint64_t>(y) << 32) | static_cast<std::uint32_t>(x)
-				),
+				CurPoint,
 				TriVerts120
 			);
 			// DirA.x * DirB.y - DirA.y * DirB.x;
-			/*
-			A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
-			*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
-			-----------------------------------------
-			*/
+			// A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
+			// B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
 			const __m256i Product = _mm256_mullo_epi32(
 				TriDirections,
 				_mm256_shuffle_epi32(
@@ -100,9 +102,20 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				),
 				0b00010101
 			);
-			Frame.Pixels[x + y * Frame.Width] |= _mm256_testz_si256(
+			// Extract sign bit to test ( X >= 0 )
+			Dest[x + y * Frame.Width] |= _mm256_testz_si256(
 				Crosses,
 				_mm256_set1_epi32(1 << 31)
+			);
+			// Get next X coordinate
+			CurPoint = _mm256_add_epi64(
+				CurPoint,
+				_mm256_set_epi64x(
+					0,
+					1,
+					0,
+					1
+				)
 			);
 		}
 	}
