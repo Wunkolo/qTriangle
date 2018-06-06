@@ -113,7 +113,7 @@ inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
 void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	const __m256i TriVerts012 = _mm256_maskload_epi64(
-		reinterpret_cast<const std::int64_t*>(&Tri.Vert),
+		reinterpret_cast<const long long int*>(&Tri.Vert),
 		_mm256_set_epi64x(0, -1, -1, -1)
 	);
 	const __m256i TriVerts120 = _mm256_permute4x64_epi64(
