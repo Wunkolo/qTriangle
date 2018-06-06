@@ -71,3 +71,18 @@ add_test(
 	NAME Benchmark
 	COMMAND Benchmark
 )
+
+## FillShape
+add_executable(
+	FillShape
+	test/FillShape.cpp
+)
+target_link_libraries(
+	FillShape
+	PRIVATE
+	qTriangle
+)
+add_test(
+	NAME FillShape
+	COMMAND FillShape
+)
