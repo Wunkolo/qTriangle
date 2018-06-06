@@ -46,7 +46,7 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	}
 }
 
-inline __m128i CrossAreaAVX2(const __m256i& VertsA, const __m256i& VertsB)
+inline __m128i CrossAreaAVX2(const __m256i VertsA, const __m256i VertsB)
 {
 	/*
 		   A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
