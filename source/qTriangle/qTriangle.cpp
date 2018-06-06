@@ -110,7 +110,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 			Frame.Pixels[x + y * Frame.Width] |= _mm256_testz_si256(
 				Crosses,
-				_mm256_set1_epi32(1 << 32)
+				_mm256_set1_epi32(1 << 31)
 			);
 		}
 	}
