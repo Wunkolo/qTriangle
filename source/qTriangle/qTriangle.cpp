@@ -46,57 +46,41 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	}
 }
 
-inline __m128i CrossAreaAVX2(const __m256i VertsA, const __m256i VertsB)
+inline __m256i CrossAreasAVX2(const __m256i VertsA, const __m256i VertsB)
 {
+	// DirA.x * DirB.y - DirA.y * DirB.x;
 	/*
 		   A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
 		*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
 		-----------------------------------------
 	*/
-	const __m256i Cross = _mm256_mullo_epi32(
+	const __m256i Dot = _mm256_mullo_epi32(
 		VertsA,
 		_mm256_shuffle_epi32(
 			VertsB,
-			_MM_SHUFFLE(2,3,0,1)
+			_MM_SHUFFLE(2, 3, 0, 1)
 		)
 	);
 	/*
 		Upper: ~ | ~ | ~ | C2 | ~ | C1 | ~ | C0
 	*/
-	const __m128i Upper = _mm256_castsi256_si128(
-		_mm256_permutevar8x32_epi32(
-			Cross,
-			_mm256_set_epi32(
-				-1,
-				-1,
-				-1,
-				-1,
-				-1,
-				4,
-				2,
-				0
-			)
-		)
+	const __m256i Upper = _mm256_blend_epi32(
+		_mm256_setzero_si256(),
+		Dot,
+		0b00010101
 	);
 	/*
 		Lower: ~ | ~ | C5 | ~ | C3 | ~ | C1 | ~
 	*/
-	const __m128i Lower = _mm256_castsi256_si128(
-		_mm256_permutevar8x32_epi32(
-			Cross,
-			_mm256_set_epi32(
-				-1,
-				-1,
-				-1,
-				-1,
-				-1,
-				5,
-				3,
-				1
-			)
-		)
+	const __m256i Lower = _mm256_srli_epi64(
+		_mm256_blend_epi32(
+			_mm256_setzero_si256(),
+			Dot,
+			0b00101010
+		),
+		32
 	);
-	return _mm_sub_epi32(
+	return _mm256_sub_epi32(
 		Upper,
 		Lower
 	);
@@ -110,7 +94,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	);
 	const __m256i TriVerts120 = _mm256_permute4x64_epi64(
 		TriVerts012,
-		_MM_SHUFFLE(3,0,2,1)
+		_MM_SHUFFLE(3, 0, 2, 1)
 	);
 	const __m256i TriDirections = _mm256_sub_epi64(
 		TriVerts120,
@@ -125,18 +109,18 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		{
 			const __m256i PointDir = _mm256_sub_epi64(
 				_mm256_set1_epi64x(
-					(static_cast<std::int64_t>(y) << 32) | x
+					(static_cast<std::int64_t>(y) << 32) | static_cast<std::uint32_t>(x)
 				),
 				TriVerts120
 			);
-			const __m128i Crosses = _mm_cmplt_epi32(
-				CrossAreaAVX2(
+			const __m256i Crosses = CrossAreasAVX2(
 					TriDirections,
 					PointDir
-				),
-				_mm_setzero_si128()
+				);
+			Frame.Pixels[x + y * Frame.Width] |= _mm256_testz_si256(
+				Crosses,
+				_mm256_set1_epi32(0b10000000000000000000000000000000)
 			);
-			Frame.Pixels[x + y * Frame.Width] |= _mm_test_all_zeros(Crosses, _mm_set1_epi32(-1));
 		}
 	}
 }
