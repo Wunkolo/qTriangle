@@ -46,37 +46,6 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	}
 }
 
-inline __m256i CrossAreasAVX2(const __m256i VertsA, const __m256i VertsB)
-{
-	// DirA.x * DirB.y - DirA.y * DirB.x;
-	/*
-		   A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
-		*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
-		-----------------------------------------
-	*/
-	const __m256i Dot = _mm256_mullo_epi32(
-		VertsA,
-		_mm256_shuffle_epi32(
-			VertsB,
-			_MM_SHUFFLE(2, 3, 0, 1)
-		)
-	);
-	// Shift lower values into appropriate value
-	const __m256i Lower = _mm256_srli_epi64(
-		Dot,
-		32
-	);
-	// Perform subtraction and extract results
-	return _mm256_blend_epi32(
-		_mm256_setzero_si256(),
-		_mm256_sub_epi32(
-			Dot,
-			Lower
-		),
-		0b00010101
-	);
-}
-
 void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	const __m256i TriVerts012 = _mm256_maskload_epi64(
@@ -100,13 +69,36 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		{
 			const __m256i PointDir = _mm256_sub_epi64(
 				_mm256_set1_epi64x(
-					(static_cast<std::int64_t>(y) << 32) | static_cast<std::uint32_t>(x)
+					(static_cast<std::uint64_t>(y) << 32) | static_cast<std::uint32_t>(x)
 				),
 				TriVerts120
 			);
-			const __m256i Crosses = CrossAreasAVX2(
+			// DirA.x * DirB.y - DirA.y * DirB.x;
+			/*
+			A: ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0
+			*  B: ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0
+			-----------------------------------------
+			*/
+			const __m256i Product = _mm256_mullo_epi32(
 				TriDirections,
-				PointDir
+				_mm256_shuffle_epi32(
+					PointDir,
+					_MM_SHUFFLE(2, 3, 0, 1)
+				)
+			);
+			// Shift lower values into appropriate value
+			const __m256i Lower = _mm256_srli_epi64(
+				Product,
+				32
+			);
+			// Perform subtraction and extract results
+			const __m256i Crosses = _mm256_blend_epi32(
+				_mm256_setzero_si256(),
+				_mm256_sub_epi32(
+					Product,
+					Lower
+				),
+				0b00010101
 			);
 			Frame.Pixels[x + y * Frame.Width] |= _mm256_testz_si256(
 				Crosses,
