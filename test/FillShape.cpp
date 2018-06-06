@@ -16,31 +16,6 @@ namespace fs = std::experimental::filesystem;
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#ifdef _WIN32
-#define NOMINMAX
-#include <Windows.h>
-// Statically enables "ENABLE_VIRTUAL_TERMINAL_PROCESSING" for the terminal
-// at runtime to allow for unix-style escape sequences. 
-static const bool _WndV100Enabled = []() -> bool
-	{
-		const auto Handle = GetStdHandle(STD_OUTPUT_HANDLE);
-		DWORD ConsoleMode;
-		GetConsoleMode(
-			Handle,
-			&ConsoleMode
-		);
-		SetConsoleMode(
-			Handle,
-			ConsoleMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING
-		);
-		GetConsoleMode(
-			Handle,
-			&ConsoleMode
-		);
-		return ConsoleMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-	}();
-#endif
-
 constexpr std::size_t Width = 200;
 constexpr std::size_t Height = 250;
 
@@ -120,7 +95,7 @@ int main()
 				Frame.Pixels.data(),
 				0
 			);
-			//qTri::Util::Draw(CurFrame);
+			// ffmpeg -f image2 -framerate 2 -i %d.png -vf "scale=iw*2:ih*2" -sws_flags neighbor Anim.gif
 			++FrameIdx;
 		}
 	}
