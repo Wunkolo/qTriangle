@@ -86,3 +86,11 @@ add_test(
 	NAME FillShape
 	COMMAND FillShape
 )
+# Link filesystem libs for GCC/Clang
+if( CMAKE_COMPILER_IS_GNUCXX )
+	target_link_libraries(
+		FillShape
+		PRIVATE
+		stdc++fs
+	)
+endif()
