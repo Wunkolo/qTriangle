@@ -5,4 +5,11 @@ qTriangle is a personal study to design a **q**uick way to rasterize **Triangles
 |||
 |:-:|:-:|
 Cross Product|Barycentric
-![](media/CrossMethod.gif)|![]()
+![](media/CrossMethod.gif)|![](media/BarycentricMethod.gif)
+
+
+# Cross Product Method
+
+![](media/Cross.gif)
+
+# Barycentric Coordinate Method
