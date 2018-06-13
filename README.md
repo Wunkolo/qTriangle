@@ -23,22 +23,22 @@ The parity of the cross-product-area depending on which side the direction of th
 
 The three positional vectors of the triangle must be in **clockwise** or **counter-clockwise** order so that three directional vectors can be determinately created.
 ```
-EdgeDir0 = Vertex0 - Vertex1
-EdgeDir1 = Vertex1 - Vertex2
-EdgeDir2 = Vertex2 - Vertex0
+EdgeDir0 = Vertex1 - Vertex0
+EdgeDir1 = Vertex2 - Vertex1
+EdgeDir2 = Vertex0 - Vertex2
 ```
 Then, three additional directional vectors can be made that point from the triangle vertex position to the point that is being tested against
 ```
-PointDir0 = Vertex0 - Point
-PointDir1 = Vertex1 - Point
-PointDir2 = Vertex2 - Point
+PointDir0 = Point - Vertex0
+PointDir1 = Point - Vertex1
+PointDir2 = Point - Vertex2
 ```
 
 Now, finding out if a point lands within the triangle is determined by using three cross-products, and checking if each area is positive. If they are all positive. Then the point is to the "right" of all the edges. If any of them are negative, then it is not within the triangle.
 ```
-| EdgeDir0 X PointDir0 | >= 0 &&
-| EdgeDir1 X PointDir1 | >= 0 &&
-| EdgeDir2 X PointDir2 | >= 0
+| EdgeDir0 × PointDir0 | >= 0 &&
+| EdgeDir1 × PointDir1 | >= 0 &&
+| EdgeDir2 × PointDir2 | >= 0
 ```
 
 ![](media/CrossMethod.gif)
@@ -57,6 +57,36 @@ EdgeDir0.x * PointDir0.y - EdgeDir0.y * PointDir0.x >= 0 &&
 EdgeDir1.x * PointDir1.y - EdgeDir1.y * PointDir1.x >= 0 &&
 EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
 ```
+
+## Scaling
+
+If I was to throw thousands of points at a triangle in a for-loop using this algorithm then not all variables have to be re-calculated.
+
+The vectors `EdgeDir0`, `EdgeDir1`, `EdgeDir2` only have to be calculated once. For each point the vectors `PointDir0`, `PointDir1`, `PointDir2` have to be recreated.
+
+```
+EdgeDir0 = Vertex1 - Vertex0
+EdgeDir1 = Vertex2 - Vertex1
+EdgeDir2 = Vertex0 - Vertex2
+foreach(CurPoint in LotsOfPoints)
+{
+	PointDir0 = Point - Vertex0
+	PointDir1 = Point - Vertex1
+	PointDir2 = Point - Vertex2
+	if(
+		EdgeDir0.x * PointDir0.y - EdgeDir0.y * PointDir0.x >=	0 &&
+		EdgeDir1.x * PointDir1.y - EdgeDir1.y * PointDir1.x >= 0 &&
+		EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
+	)
+	{
+		// CurPoint is in triangle!
+	}
+}
+```
+Which results in the total overhead for each point being
+Subtractions|Multiplications|Comparisons
+:-:|:-:|:-:
+9|6|3
 
 # Barycentric Coordinate Method
 
