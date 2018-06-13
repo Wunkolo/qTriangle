@@ -58,6 +58,32 @@ EdgeDir1.x * PointDir1.y - EdgeDir1.y * PointDir1.x >= 0 &&
 EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
 ```
 
+The full pseudo-code:
+```cpp
+// Point       - Position that is being tested
+// Vertex0,1,2 - Vertices of the triangle in clockwise order
+
+// Directional vertices along the edges of the triangle in clockwise order
+EdgeDir0 = Vertex1 - Vertex0
+EdgeDir1 = Vertex2 - Vertex1
+EdgeDir2 = Vertex0 - Vertex2
+
+// Directional vertices pointing from the triangle vertices to the point
+PointDir0 = Point - Vertex0
+PointDir1 = Point - Vertex1
+PointDir2 = Point - Vertex2
+
+// Test if each cross-product results in a positive area
+if(
+	EdgeDir0.x * PointDir0.y - EdgeDir0.y * PointDir0.x >= 0 &&
+	EdgeDir1.x * PointDir1.y - EdgeDir1.y * PointDir1.x >= 0 &&
+	EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
+)
+{
+	// CurPoint is in triangle!
+}
+```
+
 ## Scaling
 
 If I was to throw thousands of points at a triangle in a for-loop using this algorithm then not all variables have to be re-calculated.
@@ -74,7 +100,7 @@ foreach(CurPoint in LotsOfPoints)
 	PointDir1 = Point - Vertex1
 	PointDir2 = Point - Vertex2
 	if(
-		EdgeDir0.x * PointDir0.y - EdgeDir0.y * PointDir0.x >=	0 &&
+		EdgeDir0.x * PointDir0.y - EdgeDir0.y * PointDir0.x >= 0 &&
 		EdgeDir1.x * PointDir1.y - EdgeDir1.y * PointDir1.x >= 0 &&
 		EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
 	)
