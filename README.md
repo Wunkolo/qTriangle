@@ -1,6 +1,6 @@
 # qTriangle [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Wunkolo/qTriangle/master/LICENSE)
 
-qTriangle is a personal study to design a **q**uick way to rasterize **Triangles** by optimizing the and vectorizing the Point-In-Triangle problem.
+qTriangle is a personal study to design a **q**uick way to rasterize **Triangle**s by optimizing the and vectorizing the Point-In-Triangle problem.
 
 The domain of the Point-In-Triangle problem is determining if a cartesian coordinate happens to land upon the interior of a triangle. In this case the 2D case of triangles will be examined and will require some kind of surface **area** for a point to land on so a case in which all three points are collinear(which is the worst case of having a *very* slim triangle) are ruled out.
 
@@ -61,7 +61,7 @@ EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
 The full pseudo-code:
 ```cpp
 // Point       - Position that is being tested
-// Vertex0,1,2 - Vertices of the triangle in clockwise order
+// Vertex0,1,2 - Vertices of the triangle in **clockwise order**
 
 // Directional vertices along the edges of the triangle in clockwise order
 EdgeDir0 = Vertex1 - Vertex0
@@ -86,7 +86,7 @@ if(
 
 ## Scaling
 
-If I was to throw thousands of points at a triangle in a for-loop using this algorithm then not all variables have to be re-calculated.
+If I was to throw thousands of points at a triangle in a for-loop using this algorithm then not all variables have to be re-calculated for each point.
 
 The vectors `EdgeDir0`, `EdgeDir1`, `EdgeDir2` only have to be calculated once. For each point the vectors `PointDir0`, `PointDir1`, `PointDir2` have to be recreated.
 
@@ -110,6 +110,7 @@ foreach(CurPoint in LotsOfPoints)
 }
 ```
 Which results in the total overhead for each point being
+
 Subtractions|Multiplications|Comparisons
 :-:|:-:|:-:
 9|6|3
