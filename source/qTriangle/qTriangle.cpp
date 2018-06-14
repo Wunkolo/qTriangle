@@ -33,9 +33,9 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::size_t y = YBounds.first; y < YBounds.second; ++y )
+	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
 	{
-		for( std::size_t x = XBounds.first; x < XBounds.second; ++x )
+		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
 		{
 			const Vec2 CurPoint{x, y};
 			const bool Inside =
@@ -168,9 +168,9 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::size_t y = YBounds.first; y < YBounds.second; ++y )
+	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
 	{
-		for( std::size_t x = XBounds.first; x < XBounds.second; ++x )
+		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
 		{
 			const Vec2 CurPoint{x, y};
 			const Vec2 V2 = CurPoint - Tri.Vert[0];
@@ -192,9 +192,9 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 {
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::size_t y = YBounds.first; y < YBounds.second; ++y )
+	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
 	{
-		for( std::size_t x = XBounds.first; x < XBounds.second; ++x )
+		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
 		{
 			{
 				Frame.Pixels[x + y * Frame.Width] |= TestFunc({x, y}, Tri);;
