@@ -35,14 +35,14 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
 	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
 	{
-		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
+		Vec2 CurPoint{ XBounds.first, y };
+		for( ; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			const Vec2 CurPoint{x, y};
 			const bool Inside =
 				CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
 				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
 				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
-			Frame.Pixels[x + y * Frame.Width] |= Inside;
+			Frame.Pixels[CurPoint.x + y * Frame.Width] |= Inside;
 		}
 	}
 }
