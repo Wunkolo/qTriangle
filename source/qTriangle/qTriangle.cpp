@@ -77,7 +77,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	{
 		// Left-most point of current scanline
 		__m256i CurPoint = _mm256_set1_epi64x(
-			(static_cast<std::uint64_t>(YBounds.first + y) << 32) | static_cast<std::uint32_t>(XBounds.first)
+			(static_cast<std::int64_t>(YBounds.first + y) << 32) | static_cast<std::int32_t>(XBounds.first)
 		);
 		// Rasterize Scanline
 		for( std::size_t x = 0; x < Width; ++x )
@@ -111,7 +111,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				Product,
 				Lower
 			);
-			// Check if `X >= 0` for each of the 3 Z-components
+			// Check if `X >= 0` for each of the 3 Z-components 
 			// ( x >= 0 ) ⇒ ¬( X < 0 )
 			Dest[x + y * Frame.Width] |= _mm256_testz_si256(
 				// Check only the cross-area elements
