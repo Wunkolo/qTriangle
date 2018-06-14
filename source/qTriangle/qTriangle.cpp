@@ -38,7 +38,8 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 		for( std::size_t x = XBounds.first; x < XBounds.second; ++x )
 		{
 			const Vec2 CurPoint{x, y};
-			const bool Inside = CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
+			const bool Inside =
+				CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
 				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
 				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
 			Frame.Pixels[x + y * Frame.Width] |= Inside;
@@ -146,7 +147,10 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
 
 	// Convert to local plane's Barycentric coordiante system
-	return (U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f);
+	return
+		(U >= 0.0f) &&
+		(V >= 0.0f) &&
+		(U + V < 1.0f);
 }
 
 // With this method:
@@ -174,7 +178,11 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 			const std::uint32_t Dot12 = glm::compAdd(V1 * V2);
 			const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) / Det;
 			const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
-			Frame.Pixels[x + y * Frame.Width] |= ((U >= 0.0f) && (V >= 0.0f) && (U + V < 1.0f));
+			Frame.Pixels[x + y * Frame.Width] |= (
+				(U >= 0.0f) &&
+				(V >= 0.0f) &&
+				(U + V < 1.0f)
+			);
 		}
 	}
 }
@@ -195,14 +203,16 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 	}
 }
 
-const std::pair<
-	void(*)(Image& Frame, const Triangle& Tri),
-	const char*
-> FillAlgorithms[5] = {
-	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
-	{SerialBlit<Barycentric>, "Serial-Barycentric"},
-	{CrossFill, "Serial-CrossProductFill"},
-	{CrossFillAVX2, "Serial-CrossProductFillAVX2"},
-	{BarycentricFill, "Serial-BarycentricFill"}
+const std::vector<
+	std::pair<
+		void(* const)(Image& Frame, const Triangle& Tri),
+		const char*
+	>
+> FillAlgorithms = {
+	{ SerialBlit<CrossTest>,   "Serial-CrossProduct"         },
+	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
+	{ CrossFill,               "Serial-CrossProductFill"     },
+	{ CrossFillAVX2,           "Serial-CrossProductFillAVX2" },
+	{ BarycentricFill,         "Serial-BarycentricFill"      }
 };
 }

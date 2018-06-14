@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
+#include <vector>
 #include <tuple>
 
 #include "Types.hpp"
@@ -9,8 +10,10 @@
 
 namespace qTri
 {
-extern const std::pair<
-	void(*)(qTri::Image& Frame, const qTri::Triangle& Tri),
-	const char*
-> FillAlgorithms[5];
+extern const std::vector<
+	std::pair<
+		void(* const)(qTri::Image&, const qTri::Triangle&), // Function Pointer
+		const char*                                         // Algorithm Name
+	>
+> FillAlgorithms;
 }
