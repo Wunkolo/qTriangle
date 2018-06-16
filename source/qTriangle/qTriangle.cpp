@@ -42,16 +42,16 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
+	Vec2 CurPoint;
+	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
-		Vec2 CurPoint{ XBounds.first, y };
-		for( ; CurPoint.x < XBounds.second; ++CurPoint.x )
+		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
 			const bool Inside =
 				CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
 				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
 				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
-			Frame.Pixels[CurPoint.x + y * Frame.Width] |= Inside;
+			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= Inside;
 		}
 	}
 }
@@ -83,12 +83,13 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	for( std::size_t y = 0; y < Height; ++y )
+	__m256i CurPoint = _mm256_set1_epi64x(
+		(static_cast<std::int64_t>(YBounds.first) << 32)
+		| static_cast<std::int32_t>(XBounds.first)
+	);
+	// Left-most point of current scanline
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
-		// Left-most point of current scanline
-		__m256i CurPoint = _mm256_set1_epi64x(
-			(static_cast<std::int64_t>(YBounds.first + y) << 32) | static_cast<std::int32_t>(XBounds.first)
-		);
 		// Rasterize Scanline
 		for( std::size_t x = 0; x < Width; ++x )
 		{
@@ -123,7 +124,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 			// Check if `X >= 0` for each of the 3 Z-components 
 			// ( x >= 0 ) ⇒ ¬( X < 0 )
-			Dest[x + y * Frame.Width] |= _mm256_testz_si256(
+			Dest[x] |= _mm256_testz_si256(
 				// Check only the cross-area elements
 				_mm256_set_epi32(0, 0, 0, -1, 0, -1, 0, -1),
 				_mm256_cmpgt_epi32(
@@ -131,12 +132,23 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 					CrossAreas
 				)
 			);
-			// Increment to next sample coordinate
+			// Increment to next column
 			CurPoint = _mm256_add_epi32(
 				CurPoint,
 				_mm256_set1_epi64x(1)
 			);
 		}
+		// Increment to next Scanline
+		CurPoint = _mm256_add_epi32(
+			CurPoint,
+			_mm256_set1_epi64x(1L << 32)
+		);
+		// Move CurPoint back to the left of the scanline
+		CurPoint = _mm256_blend_epi32(
+			CurPoint,
+			_mm256_set1_epi32(XBounds.first),
+			0b01010101
+		);
 	}
 }
 #endif
@@ -347,17 +359,17 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
+	Vec2 CurPoint;
+	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
-		Vec2 CurPoint{ XBounds.first, y };
-		for( ; CurPoint.x < XBounds.second; ++CurPoint.x )
+		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
 			const Vec2 V2 = CurPoint - Tri.Vert[0];
 			const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 			const std::int32_t Dot12 = glm::compAdd(V1 * V2);
 			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
 			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
-			Frame.Pixels[CurPoint.x + y * Frame.Width] |= (
+			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= (
 				(U >= 0) &&
 				(V >= 0) &&
 				(U + V < Area)
@@ -373,13 +385,12 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 {
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
+	Vec2 CurPoint;
+	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
-		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
+		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			{
-				Frame.Pixels[x + y * Frame.Width] |= TestFunc({x, y}, Tri);;
-			}
+			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= TestFunc(CurPoint, Tri);
 		}
 	}
 }
