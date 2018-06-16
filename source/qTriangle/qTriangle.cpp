@@ -47,6 +47,7 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	}
 }
 
+#ifdef __AVX2__
 void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// Load triangle vertices (assumed clockwise order)
@@ -129,6 +130,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		}
 	}
 }
+#endif
 
 bool Barycentric(const Vec2& Point, const Triangle& Tri)
 {
@@ -212,7 +214,9 @@ const std::vector<
 	{ SerialBlit<CrossTest>,   "Serial-CrossProduct"         },
 	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
 	{ CrossFill,               "Serial-CrossProductFill"     },
+#ifdef __AVX2__
 	{ CrossFillAVX2,           "Serial-CrossProductFillAVX2" },
+#endif
 	{ BarycentricFill,         "Serial-BarycentricFill"      }
 };
 }
