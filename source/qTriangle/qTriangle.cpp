@@ -4,7 +4,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 
+#ifdef __AVX2__
 #include <immintrin.h>
+#endif
 
 namespace qTri
 {
