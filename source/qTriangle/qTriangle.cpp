@@ -14,6 +14,9 @@
 
 namespace qTri
 {
+
+//// Cross Product Method
+
 // Get Cross-Product Z component from two directiona vectors
 inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
 {
@@ -304,6 +307,8 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 }
 #endif
 
+//// Barycentric Method
+
 bool Barycentric(const Vec2& Point, const Triangle& Tri)
 {
 	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
@@ -316,15 +321,15 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
 
-	const glm::float32_t Det = (Dot00 * Dot11 - Dot01 * Dot01);
-	const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) / Det;
-	const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
+	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
+	const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
+	const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
 
 	// Convert to local plane's Barycentric coordiante system
 	return
-		(U >= 0.0f) &&
-		(V >= 0.0f) &&
-		(U + V < 1.0f);
+		(U >= 0) &&
+		(V >= 0) &&
+		(U + V < Area);
 }
 
 // With this method:
@@ -338,28 +343,30 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
 	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
 
-	const glm::float32_t Det = (Dot00 * Dot11 - Dot01 * Dot01);
+	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
 	for( std::int32_t y = YBounds.first; y < YBounds.second; ++y )
 	{
-		for( std::int32_t x = XBounds.first; x < XBounds.second; ++x )
+		Vec2 CurPoint{ XBounds.first, y };
+		for( ; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			const Vec2 CurPoint{x, y};
 			const Vec2 V2 = CurPoint - Tri.Vert[0];
 			const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 			const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-			const glm::float32_t U = (Dot11 * Dot02 - Dot01 * Dot12) / Det;
-			const glm::float32_t V = (Dot00 * Dot12 - Dot01 * Dot02) / Det;
-			Frame.Pixels[x + y * Frame.Width] |= (
-				(U >= 0.0f) &&
-				(V >= 0.0f) &&
-				(U + V < 1.0f)
+			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
+			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+			Frame.Pixels[CurPoint.x + y * Frame.Width] |= (
+				(U >= 0) &&
+				(V >= 0) &&
+				(U + V < Area)
 			);
 		}
 	}
 }
+
+//// Utils
 
 template< bool TestFunc(const Vec2& Point, const Triangle& Tri) >
 void SerialBlit(Image& Frame, const Triangle& Tri)
@@ -377,14 +384,16 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 	}
 }
 
+//// Exports
+
 const std::vector<
 	std::pair<
 		void(* const)(Image& Frame, const Triangle& Tri),
 		const char*
 	>
 > FillAlgorithms = {
+// Cross-Product methods
 	{ SerialBlit<CrossTest>,   "Serial-CrossProduct"         },
-	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
 	{ CrossFill,               "Serial-CrossProductFill"     },
 #ifdef __AVX2__
 	{ CrossFillAVX2,           "Serial-CrossProductFillAVX2" },
@@ -392,6 +401,8 @@ const std::vector<
 #ifdef __ARM_NEON
 	{ CrossFillNEON,           "Serial-CrossProductFillNEON" },
 #endif
+// Barycentric methods
+	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
 	{ BarycentricFill,         "Serial-BarycentricFill"      }
 };
 }
