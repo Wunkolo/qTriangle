@@ -8,6 +8,10 @@
 #include <immintrin.h>
 #endif
 
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
+
 namespace qTri
 {
 // Get Cross-Product Z component from two directiona vectors
@@ -134,6 +138,172 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 }
 #endif
 
+#ifdef __ARM_NEON
+void CrossFillNEON(Image& Frame, const Triangle& Tri)
+{
+	const int32x4x2_t TriVerts012 = vld1q_s32_x2(
+		reinterpret_cast<const std::int32_t*>(&Tri.Vert)
+	);
+	const int32x4x2_t TriVerts120 = {
+		// Lower
+		// 3 2 | 1 0
+		// 0 3 | 2 1 ; Rotate right
+		vextq_s32(
+			TriVerts012.val[0],
+			TriVerts012.val[1],
+			2
+		),
+		// Upper
+		// 1 0 | 3 2
+		// 2 1 | 0 3 ; Rotate right
+		// - - | 3 0 ; Swap
+		vextq_s32(
+			vextq_s32(
+				TriVerts012.val[1],
+				TriVerts012.val[0],
+				2
+			),
+			vextq_s32(
+				TriVerts012.val[1],
+				TriVerts012.val[0],
+				2
+			),
+			2
+		)
+	};
+
+	// Directional vectors such that each triangle vertex is pointing to
+	// the vertex before it, in counter-clockwise order
+	const int32x4x2_t TriDirections = {
+		vsubq_s32(
+			TriVerts120.val[0],
+			TriVerts012.val[0]
+		),
+		vsubq_s32(
+			TriVerts120.val[1],
+			TriVerts012.val[1]
+		)
+	};
+
+	// Iterate through triangle bounds
+	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
+	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	for( std::size_t y = 0; y < Height; ++y )
+	{
+		// Left-most point of current scanline
+		int32x4x2_t CurPoint = 
+		{
+			vreinterpretq_s32_u64(
+				vdupq_n_u64(
+					(static_cast<std::int64_t>(YBounds.first + y) << 32)
+					| static_cast<std::int32_t>(XBounds.first)
+				)
+			),
+			vreinterpretq_s32_u64(
+				vdupq_n_u64(
+					(static_cast<std::int64_t>(YBounds.first + y) << 32)
+					| static_cast<std::int32_t>(XBounds.first)
+				)
+			)
+		};
+		// Rasterize Scanline
+		for( std::size_t x = 0; x < Width; ++x )
+		{
+			const int32x4x2_t PointDir = {
+				vsubq_s32(
+					CurPoint.val[0],
+					TriVerts120.val[0]
+				),
+				vsubq_s32(
+					CurPoint.val[1],
+					TriVerts120.val[1]
+				)
+			};
+			// Compute Z-components of cross products in parallel
+			// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
+			// values at once
+
+			// Swap XY Values of Vector B's elements (int32_t)
+			// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
+			// B: [ ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0 ]
+			const int32x4x2_t Product = {
+				vmulq_s32(
+					TriDirections.val[0],
+					vrev64q_s32(
+						PointDir.val[0]
+					)
+				),
+				vmulq_s32(
+					TriDirections.val[1],
+					vrev64q_s32(
+						PointDir.val[1]
+					)
+				)
+			};
+			// Shift Y values into X value columns
+			// Subtract and calculate final dot products
+			const int32x4x2_t CrossAreas = {
+				vsubq_s32(
+					Product.val[0],
+					vrev64q_s32(Product.val[0])
+				),
+				vsubq_s32(
+					Product.val[1],
+					vrev64q_s32(Product.val[1])
+				)
+			};
+			// Check if `X >= 0` for each of the 3 Z-components 
+			// ( x >= 0 ) ⇒ ¬( X < 0 )
+			const std::int32_t Check1 = vaddvq_s32(
+				vandq_s32(
+					// Check only the cross-area elements
+					int32x4_t{ -1,0,-1,0 },
+					// Compare >= 0
+					vreinterpretq_s32_u32(
+						vcgeq_s32(
+							CrossAreas.val[0],
+							int32x4_t{ 0,0,0,0 }
+						)
+					)
+				)
+			);
+			const std::int32_t Check2 = vaddvq_s32(
+				vandq_s32(
+					// Check only the cross-area elements
+					int32x4_t{ -1,0,0,0 },
+					// Compare >= 0
+					vreinterpretq_s32_u32(
+						vcgeq_s32(
+							CrossAreas.val[1],
+							int32x4_t{ 0,0,0,0 }
+						)
+					)
+				)
+			);
+			Dest[x + y * Frame.Width] |= 
+			(
+				Check1 + Check2 == -3
+			);
+			// Increment to next sample coordinate
+			CurPoint = {
+				vaddq_s32(
+					CurPoint.val[0],
+					int32x4_t{ 1,0,1,0 }
+				),
+				vaddq_s32(
+					CurPoint.val[1],
+					int32x4_t{ 1,0,1,0 }
+				)
+			};
+		}
+	}
+}
+#endif
+
 bool Barycentric(const Vec2& Point, const Triangle& Tri)
 {
 	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
@@ -218,6 +388,9 @@ const std::vector<
 	{ CrossFill,               "Serial-CrossProductFill"     },
 #ifdef __AVX2__
 	{ CrossFillAVX2,           "Serial-CrossProductFillAVX2" },
+#endif
+#ifdef __ARM_NEON
+	{ CrossFillNEON,           "Serial-CrossProductFillNEON" },
 #endif
 	{ BarycentricFill,         "Serial-BarycentricFill"      }
 };
