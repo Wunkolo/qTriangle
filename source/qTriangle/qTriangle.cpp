@@ -207,7 +207,7 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	for( std::size_t y = 0; y < Height; ++y )
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Left-most point of current scanline
 		int32x4x2_t CurPoint = 
@@ -299,7 +299,7 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 					)
 				)
 			);
-			Dest[x + y * Frame.Width] |= 
+			Dest[x] |= 
 			(
 				Check1 + Check2 == -3
 			);
