@@ -207,24 +207,23 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	int32x4x2_t CurPoint = 
+	{
+		vreinterpretq_s32_u64(
+			vdupq_n_u64(
+				(static_cast<std::int64_t>(YBounds.first) << 32)
+				| static_cast<std::int32_t>(XBounds.first)
+			)
+		),
+		vreinterpretq_s32_u64(
+			vdupq_n_u64(
+				(static_cast<std::int64_t>(YBounds.first) << 32)
+				| static_cast<std::int32_t>(XBounds.first)
+			)
+		)
+	};
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
-		// Left-most point of current scanline
-		int32x4x2_t CurPoint = 
-		{
-			vreinterpretq_s32_u64(
-				vdupq_n_u64(
-					(static_cast<std::int64_t>(YBounds.first + y) << 32)
-					| static_cast<std::int32_t>(XBounds.first)
-				)
-			),
-			vreinterpretq_s32_u64(
-				vdupq_n_u64(
-					(static_cast<std::int64_t>(YBounds.first + y) << 32)
-					| static_cast<std::int32_t>(XBounds.first)
-				)
-			)
-		};
 		// Rasterize Scanline
 		for( std::size_t x = 0; x < Width; ++x )
 		{
@@ -272,10 +271,9 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 				)
 			};
 			// Check if `X >= 0` for each of the 3 Z-components 
-			// ( x >= 0 ) ⇒ ¬( X < 0 )
-			const std::int32_t Check1 = vaddvq_s32(
+			const std::int32_t CheckLow = vaddvq_s32(
 				vandq_s32(
-					// Check only the cross-area elements
+					// Mask only the cross-area elements
 					int32x4_t{ -1,0,-1,0 },
 					// Compare >= 0
 					vreinterpretq_s32_u32(
@@ -286,9 +284,9 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 					)
 				)
 			);
-			const std::int32_t Check2 = vaddvq_s32(
+			const std::int32_t CheckHigh = vaddvq_s32(
 				vandq_s32(
-					// Check only the cross-area elements
+					// Mask only the cross-area elements
 					int32x4_t{ -1,0,0,0 },
 					// Compare >= 0
 					vreinterpretq_s32_u32(
@@ -299,11 +297,9 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 					)
 				)
 			);
-			Dest[x] |= 
-			(
-				Check1 + Check2 == -3
-			);
-			// Increment to next sample coordinate
+			// Horizontally add the comparison bits and check if sum is -3
+			Dest[x] |= ( CheckLow + CheckHigh == -3 );
+			// Increment to next column
 			CurPoint = {
 				vaddq_s32(
 					CurPoint.val[0],
@@ -315,6 +311,34 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 				)
 			};
 		}
+		// Increment to next Scanline
+		CurPoint = {
+			vaddq_s32(
+				CurPoint.val[0],
+				int32x4_t{ 0,1,0,1 }
+			),
+			vaddq_s32(
+				CurPoint.val[1],
+				int32x4_t{ 0,1,0,1 }
+			)
+		};
+		// Move CurPoint back to the left of the scanline
+		CurPoint = {
+			vbslq_s32(
+				vreinterpretq_u32_u64(
+					vdupq_n_u64(0x00000000'FFFFFFFF)
+				),
+				vdupq_n_s32(XBounds.first),
+				CurPoint.val[0]
+			),
+			vbslq_s32(
+				vreinterpretq_u32_u64(
+					vdupq_n_u64(0x00000000'FFFFFFFF)
+				),
+				vdupq_n_s32(XBounds.first),
+				CurPoint.val[1]
+			)
+		};
 	}
 }
 #endif
