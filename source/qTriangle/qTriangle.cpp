@@ -368,7 +368,6 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 		(U + V < Area);
 }
 
-// With this method:
 //  Only V2,Dot02,Dot12,U, and V have to be re-generated for each vertex
 void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
@@ -401,6 +400,78 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 		}
 	}
 }
+
+#ifdef __ARM_NEON
+
+inline std::int32_t NEONDot(const int32x2_t A, const int32x2_t B)
+{
+	return vaddv_s32(
+		vmul_s32(A,B)
+	);
+}
+
+void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
+{
+	const int32x2x3_t CurTri = {
+		vld1_s32(reinterpret_cast<const std::int32_t*>(&Tri.Vert[0])),
+		vld1_s32(reinterpret_cast<const std::int32_t*>(&Tri.Vert[1])),
+		vld1_s32(reinterpret_cast<const std::int32_t*>(&Tri.Vert[2]))
+	};
+	const int32x2_t V0 = vsub_s32(CurTri.val[2], CurTri.val[0]);
+	const int32x2_t V1 = vsub_s32(CurTri.val[1], CurTri.val[0]);
+
+	const std::int32_t Dot00 = NEONDot(V0,V0);
+	const std::int32_t Dot01 = NEONDot(V0,V1);
+	const std::int32_t Dot11 = NEONDot(V1,V1);
+
+	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
+
+	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
+	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	int32x2_t CurPoint = 
+	{
+		static_cast<std::int32_t>(XBounds.first),
+		static_cast<std::int32_t>(YBounds.first)
+	};
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
+	{
+		// Rasterize Scanline
+		for( std::size_t x = 0; x < Width; ++x )
+		{
+			const int32x2_t V2 = vsub_s32(CurPoint,CurTri.val[0]);
+			const std::int32_t Dot02 = NEONDot(V0,V2);
+			const std::int32_t Dot12 = NEONDot(V1,V2);
+			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
+			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+			Dest[x] |= (
+				(U >= 0) &&
+				(V >= 0) &&
+				(U + V < Area)
+			);
+			// Increment to next column
+			CurPoint = vadd_s32(
+				CurPoint,
+				int32x2_t{1,0}
+			);
+		}
+		// Increment to next Scanline
+		CurPoint = vadd_s32(
+			CurPoint,
+			int32x2_t{0,1}
+		);
+		// Move CurPoint back to the left of the scanline
+		CurPoint = vset_lane_s32(
+			XBounds.first,
+			CurPoint,
+			0
+		);
+	}
+}
+#endif
 
 //// Utils
 
@@ -438,6 +509,9 @@ const std::vector<
 #endif
 // Barycentric methods
 	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
-	{ BarycentricFill,         "Serial-BarycentricFill"      }
+	{ BarycentricFill,         "Serial-BarycentricFill"      },
+#ifdef __ARM_NEON
+	{ BarycentricFillNEON,     "Serial-BarycentricFillNEON"  },
+#endif
 };
 }
