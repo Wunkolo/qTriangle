@@ -13,7 +13,7 @@ void Draw(const qTri::Image& Frame)
 		for( std::size_t x = 0; x < Frame.Width; ++x )
 		{
 			std::putchar(
-				" @"[Frame.Pixels[x + y * Frame.Width] & 1]
+				" \xFE"[Frame.Pixels[x + y * Frame.Width] & 1]
 			);
 		}
 		std::fputs("\033[0;35m|\n", stdout);
