@@ -401,6 +401,85 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 	}
 }
 
+#ifdef __AVX2__
+
+// SSSE3
+inline std::int32_t hadd_epi32(const __m128i& A)
+{
+	__m128i Sum = _mm_hadd_epi32(A,A);
+	Sum = _mm_hadd_epi32(Sum,Sum);
+	return _mm_cvtsi128_si32(Sum);
+}
+
+// SSE4.1
+inline std::int32_t SSEDot64(const __m128i& A, const __m128i& B)
+{
+	return hadd_epi32(
+		_mm_mul_epi32(
+			A,
+			B
+		)
+	);
+}
+
+void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
+{
+	// 128-bit vectors composing of two 64-bit values
+	const __m128i CurTri[3] = {
+		_mm_set_epi64x(Tri.Vert[0].y,Tri.Vert[0].x),
+		_mm_set_epi64x(Tri.Vert[1].y,Tri.Vert[1].x),
+		_mm_set_epi64x(Tri.Vert[2].y,Tri.Vert[2].x)
+	};
+	const __m128i V0 = _mm_sub_epi64(CurTri[2], CurTri[0]);
+	const __m128i V1 = _mm_sub_epi64(CurTri[1], CurTri[0]);
+
+	const std::int32_t Dot00 = SSEDot64(V0, V0);
+	const std::int32_t Dot01 = SSEDot64(V0, V1);
+	const std::int32_t Dot11 = SSEDot64(V1, V1);
+
+	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
+
+	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
+	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	__m128i CurPoint = _mm_set_epi64x(YBounds.first,XBounds.first);
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
+	{
+		// Rasterize Scanline
+		for( std::size_t x = 0; x < Width; ++x )
+		{
+			const __m128i V2 = _mm_sub_epi64(CurPoint,CurTri[0]);
+			const std::int32_t Dot02 = SSEDot64(V0, V2);
+			const std::int32_t Dot12 = SSEDot64(V1, V2);
+			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
+			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+			Dest[x] |= (
+				(U >= 0) &&
+				(V >= 0) &&
+				(U + V < Area)
+			);
+			CurPoint = _mm_add_epi64(
+				CurPoint,
+				_mm_set_epi64x(0,1)
+			);
+		}
+		// CurPoint.x = XBounds.first;
+		CurPoint = _mm_blend_epi32(
+			CurPoint,
+			_mm_set1_epi64x(XBounds.first),
+			0b0011
+		);
+		CurPoint = _mm_add_epi64(
+			CurPoint,
+			_mm_set_epi64x(1,0)
+		);
+	}
+}
+#endif
+
 #ifdef __ARM_NEON
 
 inline std::int32_t NEONDot(const int32x2_t A, const int32x2_t B)
@@ -510,6 +589,9 @@ const std::vector<
 // Barycentric methods
 	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
 	{ BarycentricFill,         "Serial-BarycentricFill"      },
+#ifdef __AVX2__
+	{ BarycentricFillAVX2,     "Serial-BarycentricFillAVX2"  },
+#endif
 #ifdef __ARM_NEON
 	{ BarycentricFillNEON,     "Serial-BarycentricFillNEON"  },
 #endif
