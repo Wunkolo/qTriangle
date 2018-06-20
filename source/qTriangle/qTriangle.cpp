@@ -403,18 +403,16 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 #ifdef __AVX2__
 
-// SSSE3
-inline std::int32_t hadd_epi32(const __m128i& A)
+// SSE4.1
+inline std::int32_t hadd_epi64(const __m128i& A)
 {
-	__m128i Sum = _mm_hadd_epi32(A,A);
-	Sum = _mm_hadd_epi32(Sum,Sum);
-	return _mm_cvtsi128_si32(Sum);
+	return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
 }
 
 // SSE4.1
 inline std::int32_t SSEDot64(const __m128i& A, const __m128i& B)
 {
-	return hadd_epi32(
+	return hadd_epi64(
 		_mm_mul_epi32(
 			A,
 			B
@@ -436,6 +434,14 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	const std::int32_t Dot00 = SSEDot64(V0, V0);
 	const std::int32_t Dot01 = SSEDot64(V0, V1);
 	const std::int32_t Dot11 = SSEDot64(V1, V1);
+	const __m128i CrossVec1 = _mm_set_epi64x(
+		Dot00,
+		Dot11
+	);
+	const __m128i CrossVec2 = _mm_set_epi64x(
+		Dot01,
+		Dot01
+	);
 
 	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
@@ -452,14 +458,40 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		for( std::size_t x = 0; x < Width; ++x )
 		{
 			const __m128i V2 = _mm_sub_epi64(CurPoint,CurTri[0]);
+
+			// TODO: Find a way to have the dot-product already result in
+			// a 64x2 vector
 			const std::int32_t Dot02 = SSEDot64(V0, V2);
 			const std::int32_t Dot12 = SSEDot64(V1, V2);
-			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
-			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+			const __m128i DotVec = _mm_set_epi64x( Dot12, Dot02 );
+
+			//    CrossVec1       CrossVec2
+			//       |     DotVec    |     DotVec(Reversed)
+			//       |       |       |       |
+			//       V       V       V       V
+			//U = (Dot11 * Dot02 - Dot01 * Dot12);
+			//V = (Dot00 * Dot12 - Dot01 * Dot02);
+			const __m128i UV = _mm_sub_epi64(
+				_mm_mul_epi32(
+					CrossVec1,
+					DotVec
+				),
+				_mm_mul_epi32(
+					CrossVec2,
+					_mm_alignr_epi8(DotVec,DotVec,8)
+				)
+			);
+			// ( x >= 0 ) ⇒ ¬( X < 0 )
+			const __m128i UVTest = _mm_cmplt_epi32(
+				UV,
+				_mm_setzero_si128()
+			);
 			Dest[x] |= (
-				(U >= 0) &&
-				(V >= 0) &&
-				(U + V < Area)
+				_mm_testz_si128(
+					_mm_set_epi32(0,-1,0,-1),
+					UVTest
+				) &&
+				(_mm_extract_epi64(UV,0) + _mm_extract_epi64(UV,1)) < Area
 			);
 			CurPoint = _mm_add_epi64(
 				CurPoint,
