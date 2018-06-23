@@ -491,7 +491,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					_mm_set_epi32(0,-1,0,-1),
 					UVTest
 				) &&
-				(_mm_extract_epi64(UV,0) + _mm_extract_epi64(UV,1)) < Area
+				hadd_epi64(UV) < Area
 			);
 			CurPoint = _mm_add_epi64(
 				CurPoint,
