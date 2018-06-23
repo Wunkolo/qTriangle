@@ -406,11 +406,17 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 // SSE4.1
 inline std::int32_t hadd_epi64(const __m128i& A)
 {
-	return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
+	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
+	return _mm_cvtsi128_si64(
+		_mm_add_epi64(
+			_mm_unpackhi_epi64(A, A),
+			_mm_unpacklo_epi64(A, A)
+		)
+	);
 }
 
 // SSE4.1
-inline std::int32_t SSEDot64(const __m128i& A, const __m128i& B)
+inline std::int32_t dot_epi64(const __m128i& A, const __m128i& B)
 {
 	return hadd_epi64(
 		_mm_mul_epi32(
@@ -431,9 +437,9 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	const __m128i V0 = _mm_sub_epi64(CurTri[2], CurTri[0]);
 	const __m128i V1 = _mm_sub_epi64(CurTri[1], CurTri[0]);
 
-	const std::int32_t Dot00 = SSEDot64(V0, V0);
-	const std::int32_t Dot01 = SSEDot64(V0, V1);
-	const std::int32_t Dot11 = SSEDot64(V1, V1);
+	const std::int32_t Dot00 = dot_epi64(V0, V0);
+	const std::int32_t Dot01 = dot_epi64(V0, V1);
+	const std::int32_t Dot11 = dot_epi64(V1, V1);
 	const __m128i CrossVec1 = _mm_set_epi64x(
 		Dot00,
 		Dot11
@@ -461,8 +467,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 
 			// TODO: Find a way to have the dot-product already result in
 			// a 64x2 vector
-			const std::int32_t Dot02 = SSEDot64(V0, V2);
-			const std::int32_t Dot12 = SSEDot64(V1, V2);
+			const std::int32_t Dot02 = dot_epi64(V0, V2);
+			const std::int32_t Dot12 = dot_epi64(V1, V2);
 			const __m128i DotVec = _mm_set_epi64x( Dot12, Dot02 );
 
 			//    CrossVec1       CrossVec2
