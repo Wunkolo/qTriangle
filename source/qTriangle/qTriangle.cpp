@@ -404,7 +404,7 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 #ifdef __AVX2__
 
 // SSE4.1
-inline std::int32_t hadd_epi64(const __m128i& A)
+inline std::int32_t _mm_hadd_epi64(const __m128i& A)
 {
 	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
 	return _mm_cvtsi128_si64(
@@ -416,9 +416,9 @@ inline std::int32_t hadd_epi64(const __m128i& A)
 }
 
 // SSE4.1
-inline std::int32_t dot_epi64(const __m128i& A, const __m128i& B)
+inline std::int32_t _mm_dot_epi64(const __m128i& A, const __m128i& B)
 {
-	return hadd_epi64(
+	return _mm_hadd_epi64(
 		_mm_mul_epi32(
 			A,
 			B
@@ -428,7 +428,7 @@ inline std::int32_t dot_epi64(const __m128i& A, const __m128i& B)
 
 // AVX2
 // Two 128-lane horizontal sums into a 64-bit integer
-inline __m128i __vectorcall m256_hadd_epi64(const __m256i& A)
+inline __m128i _mm256_hadd_epi64(const __m256i& A)
 {
 	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
 	const __m256i Sum = _mm256_add_epi64(
@@ -444,7 +444,7 @@ inline __m128i __vectorcall m256_hadd_epi64(const __m256i& A)
 // AVX2
 // Two concurrent dot-products at once
 // Store the two 64-bit results into a 128 register
-inline __m128i m256_dot_epi64(const __m256i& A, const __m256i& B)
+inline __m128i _mm256_dot_epi64(const __m256i& A, const __m256i& B)
 {
 	const auto Product = _mm256_mul_epi32(A, B);
 	const auto Sum = _mm256_add_epi64(
@@ -468,9 +468,9 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	const __m128i V0 = _mm_sub_epi64(CurTri[2], CurTri[0]);
 	const __m128i V1 = _mm_sub_epi64(CurTri[1], CurTri[0]);
 
-	const std::int32_t Dot00 = dot_epi64(V0, V0);
-	const std::int32_t Dot01 = dot_epi64(V0, V1);
-	const std::int32_t Dot11 = dot_epi64(V1, V1);
+	const std::int32_t Dot00 = _mm_dot_epi64(V0, V0);
+	const std::int32_t Dot01 = _mm_dot_epi64(V0, V1);
+	const std::int32_t Dot11 = _mm_dot_epi64(V1, V1);
 	const __m128i CrossVec1 = _mm_set_epi64x(
 		Dot00,
 		Dot11
@@ -510,13 +510,17 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 
 			// contains 2 64-bit dot-products for each of the two samples
-			const __m128i Dot02 = m256_dot_epi64( _mm256_set_m128i(V0,V0), V2);
-			const __m128i Dot12 = m256_dot_epi64( _mm256_set_m128i(V1,V1), V2);
-			const __m256i DotVec = _mm256_set_epi64x(
-				_mm_extract_epi64(Dot12,1), // Hi (Point 2)
-				_mm_extract_epi64(Dot02,1),
-				_mm_extract_epi64(Dot12,0), // Lo (Point 1)
-				_mm_extract_epi64(Dot02,0)
+			const __m128i Dot02 = _mm256_dot_epi64( _mm256_set_m128i(V0,V0), V2);
+			const __m128i Dot12 = _mm256_dot_epi64( _mm256_set_m128i(V1,V1), V2);
+			const __m256i DotVec = _mm256_set_m128i(
+				_mm_unpackhi_epi64(
+					Dot02,
+					Dot12
+				),
+				_mm_unpacklo_epi64(
+					Dot02,
+					Dot12
+				)
 			);
 
 			//    CrossVec1       CrossVec2
@@ -540,19 +544,24 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				_mm256_setzero_si256(),
 				UV
 			);
+			const __m128i UVAreas = _mm256_hadd_epi64(UV);
+			const __m128i UVAreaTests = _mm_cmpgt_epi64(
+				_mm_set1_epi64x(Area),
+				UVAreas
+			);
 			Dest[x] |= (
 				_mm_testz_si128(
-					_mm_set_epi32(0, -1, 0, -1),
+					_mm_set1_epi64x(0xFFFFFFFF),
 					_mm256_extracti128_si256(UVTests,0)
 				)
-				&& hadd_epi64(_mm256_extracti128_si256(UV,0)) < Area
+				&& _mm_extract_epi64(UVAreaTests,0) == -1
 			);
 			Dest[x + 1] |= (
 				_mm_testz_si128(
-					_mm_set_epi32(0, -1, 0, -1),
+					_mm_set1_epi64x(0xFFFFFFFF),
 					_mm256_extracti128_si256(UVTests, 1)
 				)
-				&& hadd_epi64(_mm256_extracti128_si256(UV, 1)) < Area
+				&& _mm_extract_epi64(UVAreaTests, 1) == -1
 			);
 			CurPoint = _mm_add_epi64(
 				CurPoint,
@@ -566,8 +575,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 
 			// TODO: Find a way to have the dot-product already result in
 			// a 64x2 vector
-			const std::int32_t Dot02 = dot_epi64(V0, V2);
-			const std::int32_t Dot12 = dot_epi64(V1, V2);
+			const std::int32_t Dot02 = _mm_dot_epi64(V0, V2);
+			const std::int32_t Dot12 = _mm_dot_epi64(V1, V2);
 			const __m128i DotVec = _mm_set_epi64x( Dot12, Dot02 );
 
 			//    CrossVec1       CrossVec2
@@ -596,7 +605,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					_mm_set_epi32(0,-1,0,-1),
 					UVTest
 				) &&
-				hadd_epi64(UV) < Area
+				_mm_hadd_epi64(UV) < Area
 			);
 			CurPoint = _mm_add_epi64(
 				CurPoint,
