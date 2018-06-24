@@ -452,8 +452,8 @@ inline __m128i _mm256_dot_epi64(const __m256i& A, const __m256i& B)
 		_mm256_unpacklo_epi64(Product, Product)
 	);
 	return _mm_set_epi64x(
-		_mm256_extract_epi64(Sum,2),
-		_mm256_extract_epi64(Sum,0)
+		_mm256_extract_epi64(Sum, 2),
+		_mm256_extract_epi64(Sum, 0)
 	);
 }
 
@@ -510,8 +510,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 
 			// contains 2 64-bit dot-products for each of the two samples
-			const __m128i Dot02 = _mm256_dot_epi64( _mm256_set_m128i(V0,V0), V2);
-			const __m128i Dot12 = _mm256_dot_epi64( _mm256_set_m128i(V1,V1), V2);
+			const __m128i Dot02 = _mm256_dot_epi64(_mm256_broadcastsi128_si256(V0), V2);
+			const __m128i Dot12 = _mm256_dot_epi64(_mm256_broadcastsi128_si256(V1), V2);
 			const __m256i DotVec = _mm256_set_m128i(
 				_mm_unpackhi_epi64(
 					Dot02,
@@ -531,11 +531,11 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			//V = (Dot00 * Dot12 - Dot01 * Dot02);
 			const __m256i UV = _mm256_sub_epi64(
 				_mm256_mul_epi32(
-					_mm256_set_m128i(CrossVec1,CrossVec1),
+					_mm256_broadcastsi128_si256(CrossVec1),
 					DotVec
 				),
 				_mm256_mul_epi32(
-					_mm256_set_m128i(CrossVec2,CrossVec2),
+					_mm256_broadcastsi128_si256(CrossVec2),
 					_mm256_alignr_epi8(DotVec, DotVec, 8)
 				)
 			);
