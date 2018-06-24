@@ -426,6 +426,37 @@ inline std::int32_t dot_epi64(const __m128i& A, const __m128i& B)
 	);
 }
 
+// AVX2
+// Two 128-lane horizontal sums into a 64-bit integer
+inline __m128i __vectorcall m256_hadd_epi64(const __m256i& A)
+{
+	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
+	const __m256i Sum = _mm256_add_epi64(
+		_mm256_unpackhi_epi64(A, A),
+		_mm256_unpacklo_epi64(A, A)
+	);
+	return _mm_set_epi64x(
+		_mm256_extract_epi64(Sum,2),
+		_mm256_extract_epi64(Sum,0)
+	);
+}
+
+// AVX2
+// Two concurrent dot-products at once
+// Store the two 64-bit results into a 128 register
+inline __m128i m256_dot_epi64(const __m256i& A, const __m256i& B)
+{
+	const auto Product = _mm256_mul_epi32(A, B);
+	const auto Sum = _mm256_add_epi64(
+		_mm256_unpackhi_epi64(Product,Product),
+		_mm256_unpacklo_epi64(Product, Product)
+	);
+	return _mm_set_epi64x(
+		_mm256_extract_epi64(Sum,2),
+		_mm256_extract_epi64(Sum,0)
+	);
+}
+
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// 128-bit vectors composing of two 64-bit values
@@ -461,7 +492,75 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Rasterize Scanline
-		for( std::size_t x = 0; x < Width; ++x )
+		std::size_t x = 0;
+		// Two samples at a time
+		for( ; x < Width; x += 2 )
+		{
+			const __m256i V2 = _mm256_sub_epi64(
+				_mm256_set_m128i(
+					// Second point ( next point over )
+					_mm_add_epi64(
+						CurPoint,
+						_mm_set_epi64x(0,1)
+					),
+					// First point
+					CurPoint
+				),
+				_mm256_set_m128i(CurTri[0],CurTri[0])
+			);
+
+			// contains 2 64-bit dot-products for each of the two samples
+			const __m128i Dot02 = m256_dot_epi64( _mm256_set_m128i(V0,V0), V2);
+			const __m128i Dot12 = m256_dot_epi64( _mm256_set_m128i(V1,V1), V2);
+			const __m256i DotVec = _mm256_set_epi64x(
+				_mm_extract_epi64(Dot12,1), // Hi (Point 2)
+				_mm_extract_epi64(Dot02,1),
+				_mm_extract_epi64(Dot12,0), // Lo (Point 1)
+				_mm_extract_epi64(Dot02,0)
+			);
+
+			//    CrossVec1       CrossVec2
+			//       |     DotVec    |     DotVec(Reversed)
+			//       |       |       |       |
+			//       V       V       V       V
+			//U = (Dot11 * Dot02 - Dot01 * Dot12);
+			//V = (Dot00 * Dot12 - Dot01 * Dot02);
+			const __m256i UV = _mm256_sub_epi64(
+				_mm256_mul_epi32(
+					_mm256_set_m128i(CrossVec1,CrossVec1),
+					DotVec
+				),
+				_mm256_mul_epi32(
+					_mm256_set_m128i(CrossVec2,CrossVec2),
+					_mm256_alignr_epi8(DotVec, DotVec, 8)
+				)
+			);
+			// ( x >= 0 ) ⇒ ¬( X < 0 ) ⇒ ¬( 0 > X )
+			const __m256i UVTests = _mm256_cmpgt_epi32(
+				_mm256_setzero_si256(),
+				UV
+			);
+			Dest[x] |= (
+				_mm_testz_si128(
+					_mm_set_epi32(0, -1, 0, -1),
+					_mm256_extracti128_si256(UVTests,0)
+				)
+				&& hadd_epi64(_mm256_extracti128_si256(UV,0)) < Area
+			);
+			Dest[x + 1] |= (
+				_mm_testz_si128(
+					_mm_set_epi32(0, -1, 0, -1),
+					_mm256_extracti128_si256(UVTests, 1)
+				)
+				&& hadd_epi64(_mm256_extracti128_si256(UV, 1)) < Area
+			);
+			CurPoint = _mm_add_epi64(
+				CurPoint,
+				_mm_set_epi64x(0, 2)
+			);
+		}
+		// Serial-ish
+		for( ; x < Width; ++x )
 		{
 			const __m128i V2 = _mm_sub_epi64(CurPoint,CurTri[0]);
 
