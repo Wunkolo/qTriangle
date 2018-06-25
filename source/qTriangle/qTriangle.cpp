@@ -404,7 +404,7 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 #ifdef __AVX2__
 
 // SSE4.1
-inline std::int32_t _mm_hadd_epi64(const __m128i& A)
+inline std::int64_t _mm_hadd_epi64(const __m128i A)
 {
 	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
 	return _mm_cvtsi128_si64(
@@ -416,7 +416,7 @@ inline std::int32_t _mm_hadd_epi64(const __m128i& A)
 }
 
 // SSE4.1
-inline std::int32_t _mm_dot_epi64(const __m128i& A, const __m128i& B)
+inline std::int32_t _mm_dot_epi64(const __m128i A, const __m128i B)
 {
 	return _mm_hadd_epi64(
 		_mm_mul_epi32(
@@ -427,43 +427,36 @@ inline std::int32_t _mm_dot_epi64(const __m128i& A, const __m128i& B)
 }
 
 // AVX2
-// Two 128-lane horizontal sums into a 64-bit integer
-inline __m128i _mm256_hadd_epi64(const __m256i& A)
+// Sums 2 64-bit integers in each 128-bit lane
+// Returns the two 64-bit results in a 128-bit register
+inline __m128i _mm256_hadd_epi64(const __m256i A)
 {
-	// return _mm_extract_epi64(A,0) + _mm_extract_epi64(A,1);
 	const __m256i Sum = _mm256_add_epi64(
 		_mm256_unpackhi_epi64(A, A),
 		_mm256_unpacklo_epi64(A, A)
 	);
-	return _mm_set_epi64x(
-		_mm256_extract_epi64(Sum,2),
-		_mm256_extract_epi64(Sum,0)
+	return _mm_unpacklo_epi64(
+		_mm256_castsi256_si128(Sum),
+		_mm256_extracti128_si256(Sum,1)
 	);
 }
 
 // AVX2
 // Two concurrent dot-products at once
 // Store the two 64-bit results into a 128 register
-inline __m128i _mm256_dot_epi64(const __m256i& A, const __m256i& B)
+inline __m128i _mm256_dot_epi64(const __m256i A, const __m256i B)
 {
-	const auto Product = _mm256_mul_epi32(A, B);
-	const auto Sum = _mm256_add_epi64(
-		_mm256_unpackhi_epi64(Product,Product),
-		_mm256_unpacklo_epi64(Product, Product)
-	);
-	return _mm_set_epi64x(
-		_mm256_extract_epi64(Sum, 2),
-		_mm256_extract_epi64(Sum, 0)
-	);
+	const __m256i Product = _mm256_mul_epi32(A, B);
+	return _mm256_hadd_epi64(Product);
 }
 
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// 128-bit vectors composing of two 64-bit values
 	const __m128i CurTri[3] = {
-		_mm_set_epi64x(Tri.Vert[0].y,Tri.Vert[0].x),
-		_mm_set_epi64x(Tri.Vert[1].y,Tri.Vert[1].x),
-		_mm_set_epi64x(Tri.Vert[2].y,Tri.Vert[2].x)
+		_mm_set_epi64x(Tri.Vert[0].y, Tri.Vert[0].x),
+		_mm_set_epi64x(Tri.Vert[1].y, Tri.Vert[1].x),
+		_mm_set_epi64x(Tri.Vert[2].y, Tri.Vert[2].x)
 	};
 	const __m128i V0 = _mm_sub_epi64(CurTri[2], CurTri[0]);
 	const __m128i V1 = _mm_sub_epi64(CurTri[1], CurTri[0]);
@@ -506,7 +499,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					// First point
 					CurPoint
 				),
-				_mm256_set_m128i(CurTri[0],CurTri[0])
+				_mm256_broadcastsi128_si256(CurTri[0])
 			);
 
 			// contains 2 64-bit dot-products for each of the two samples
