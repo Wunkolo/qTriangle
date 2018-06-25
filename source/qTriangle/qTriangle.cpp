@@ -487,7 +487,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		// Rasterize Scanline
 		std::size_t x = 0;
 		// Two samples at a time
-		for( ; x + 2 < Width; x += 2 )
+		for( std::size_t i = 0; i < Width / 2; ++i, x += 2 )
 		{
 			const __m256i V2 = _mm256_sub_epi64(
 				_mm256_set_m128i(
