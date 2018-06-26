@@ -666,23 +666,25 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 			const int32x2_t V2 = vsub_s32(CurPoint,CurTri.val[0]);
 			const std::int32_t Dot02 = NEONDot(V0,V2);
 			const std::int32_t Dot12 = NEONDot(V1,V2);
-			const int32x2_t DotVec = int32x2_t{Dot02, Dot12};
-			const int32x2_t UV = vsub_s32(
-				vmul_s32(CrossVec1,DotVec),
-				vmul_s32(CrossVec2,vrev64_s32(DotVec))
-			);
 			//     CrossVec1       CrossVec2
 			//        |     DotVec    |     DotVec(Reversed)
 			//        |       |       |       |
 			//        V       V       V       V
 			// U = (Dot11 * Dot02 - Dot01 * Dot12);
 			// V = (Dot00 * Dot12 - Dot01 * Dot02);
-			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
-			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+			const int32x2_t DotVec = int32x2_t{Dot02, Dot12};
+			const int32x2_t UV = vsub_s32(
+				vmul_s32(CrossVec1,DotVec),
+				vmul_s32(CrossVec2,vrev64_s32(DotVec))
+			);
+			const int32_t UVArea = vaddv_s32(UV);
+			const int32_t Compare = vaddv_u32(
+				vcge_s32(UV, vdup_n_s32(0) )
+			);
 			Dest[x] |= (
-				(U >= 0) &&
-				(V >= 0) &&
-				(U + V < Area)
+				Compare == -2 // Both terms are ">= 0"
+				&&
+				(UVArea < Area)
 			);
 			// Increment to next column
 			CurPoint = vadd_s32(
