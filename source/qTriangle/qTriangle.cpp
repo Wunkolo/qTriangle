@@ -572,12 +572,12 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			const std::int32_t Dot12 = _mm_dot_epi64(V1, V2);
 			const __m128i DotVec = _mm_set_epi64x( Dot12, Dot02 );
 
-			//    CrossVec1       CrossVec2
-			//       |     DotVec    |     DotVec(Reversed)
-			//       |       |       |       |
-			//       V       V       V       V
-			//U = (Dot11 * Dot02 - Dot01 * Dot12);
-			//V = (Dot00 * Dot12 - Dot01 * Dot02);
+			//     CrossVec1       CrossVec2
+			//        |     DotVec    |     DotVec(Reversed)
+			//        |       |       |       |
+			//        V       V       V       V
+			// U = (Dot11 * Dot02 - Dot01 * Dot12);
+			// V = (Dot00 * Dot12 - Dot01 * Dot02);
 			const __m128i UV = _mm_sub_epi64(
 				_mm_mul_epi32(
 					CrossVec1,
@@ -642,6 +642,9 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 	const std::int32_t Dot01 = NEONDot(V0,V1);
 	const std::int32_t Dot11 = NEONDot(V1,V1);
 
+	const int32x2_t CrossVec1 = int32x2_t{Dot11,Dot00};
+	const int32x2_t CrossVec2 = vdup_n_s32(Dot01);
+
 	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
@@ -663,6 +666,17 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 			const int32x2_t V2 = vsub_s32(CurPoint,CurTri.val[0]);
 			const std::int32_t Dot02 = NEONDot(V0,V2);
 			const std::int32_t Dot12 = NEONDot(V1,V2);
+			const int32x2_t DotVec = int32x2_t{Dot02, Dot12};
+			const int32x2_t UV = vsub_s32(
+				vmul_s32(CrossVec1,DotVec),
+				vmul_s32(CrossVec2,vrev64_s32(DotVec))
+			);
+			//     CrossVec1       CrossVec2
+			//        |     DotVec    |     DotVec(Reversed)
+			//        |       |       |       |
+			//        V       V       V       V
+			// U = (Dot11 * Dot02 - Dot01 * Dot12);
+			// V = (Dot00 * Dot12 - Dot01 * Dot02);
 			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
 			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
 			Dest[x] |= (
