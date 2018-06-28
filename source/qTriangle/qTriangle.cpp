@@ -618,11 +618,11 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U = ( Dot11 * Dot02 - Dot01 * Dot12 );
 			// V = ( Dot00 * Dot12 - Dot01 * Dot02 );
 			const __m256i UV = _mm256_sub_epi64(
-				_mm256_mullo_epi64(
+				_mm256_mul_epi32(
 					_mm256_broadcastsi128_si256(CrossVec1),
 					DotVec
 				),
-				_mm256_mullo_epi64(
+				_mm256_mul_epi32(
 					_mm256_broadcastsi128_si256(CrossVec2),
 					_mm256_alignr_epi8(DotVec, DotVec, 8)
 				)
@@ -674,11 +674,11 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U = (Dot11 * Dot02 - Dot01 * Dot12);
 			// V = (Dot00 * Dot12 - Dot01 * Dot02);
 			const __m128i UV = _mm_sub_epi64(
-				_mm_mullo_epi64(
+				_mm_mul_epi32(
 					CrossVec1,
 					DotVec
 				),
-				_mm_mullo_epi64(
+				_mm_mul_epi32(
 					CrossVec2,
 					_mm_alignr_epi8(DotVec,DotVec,8)
 				)
