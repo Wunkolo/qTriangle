@@ -14,7 +14,6 @@
 
 namespace qTri
 {
-
 //// Cross Product Method
 
 // Get Cross-Product Z component from two directiona vectors
@@ -100,7 +99,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			// Compute Z-components of cross products in parallel
 			// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
 			// values at once
-
+			
 			// Swap XY Values of Vector B's elements (int32_t)
 			// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
 			// B: [ ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0 ]
@@ -238,11 +237,11 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 				)
 			};
 			// Compute Z-components of cross products in parallel
-			// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
-			// values at once
-
-			// Swap XY Values of Vector B's elements (int32_t)
-			// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
+		// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
+		// values at once
+		
+		// Swap XY Values of Vector B's elements (int32_t)
+		// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
 			// B: [ ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0 ]
 			const int32x4x2_t Product = {
 				vmulq_s32(
@@ -443,11 +442,35 @@ inline __m128i _mm256_hadd_epi64(const __m256i A)
 
 // AVX2
 // Two concurrent dot-products at once
-// Store the two 64-bit results into a 128 register
+// Store the two 64-bit results into a 128-bit register
 inline __m128i _mm256_dot_epi64(const __m256i A, const __m256i B)
 {
 	const __m256i Product = _mm256_mul_epi32(A, B);
 	return _mm256_hadd_epi64(Product);
+}
+
+// AVX512
+// Sums 4 64-bit integers in each 128-bit lane
+// Returns the four 64-bit results in a 256-bit register
+inline __m256i _mm512_hadd_epi64(const __m512i A)
+{
+	const __m512i Sum = _mm512_add_epi64(
+		_mm512_unpackhi_epi64(A, A),
+		_mm512_unpacklo_epi64(A, A)
+	);
+	return _mm256_unpacklo_epi64(
+		_mm512_castsi512_si256(Sum),
+		_mm512_extracti64x4_epi64(Sum, 1)
+	);
+}
+
+// AVX512
+// Two concurrent dot-products at once
+// Store the four 64-bit results into a 256-bit register
+inline __m256i _mm512_dot_epi64(const __m512i A, const __m512i B)
+{
+	const __m512i Product = _mm512_mullo_epi64(A, B);
+	return _mm512_hadd_epi64(Product);
 }
 
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
@@ -486,8 +509,80 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	{
 		// Rasterize Scanline
 		std::size_t x = 0;
+
+		#if defined(__AVX512F__) || defined(_MSC_VER)
+		// Four samples at a time
+		for( std::size_t i = 0; i < (Width - x) / 4; ++i, x += 4 )
+		{
+			const __m512i V2 = _mm512_sub_epi64(
+				_mm512_add_epi64(
+					_mm512_broadcast_i64x2(CurPoint),
+					_mm512_set_epi64(
+						0,3, // Fourth  point
+						0,2, // Third   point
+						0,1, // Second  point
+						0,0  // Current point
+					)
+				),
+				_mm512_broadcast_i64x2(CurTri[0])
+			);
+
+			// contains 4 64-bit dot-products for each of the two samples
+			const __m256i Dot02 = _mm512_dot_epi64(_mm512_broadcast_i64x2(V0), V2);
+			const __m256i Dot12 = _mm512_dot_epi64(_mm512_broadcast_i64x2(V1), V2);
+			const __m512i DotVec = _mm512_inserti64x4(
+				_mm512_castsi256_si512(
+					_mm256_unpacklo_epi64(
+						Dot02,
+						Dot12
+					)
+				),
+				_mm256_unpackhi_epi64(
+					Dot02,
+					Dot12
+				),
+				1
+			);
+
+			//     CrossVec1       CrossVec2
+			//        |     DotVec    |     DotVec(Reversed)
+			//        |       |       |       |
+			//        V       V       V       V
+			// U = ( Dot11 * Dot02 - Dot01 * Dot12 );
+			// V = ( Dot00 * Dot12 - Dot01 * Dot02 );
+			const __m512i UVs = _mm512_sub_epi64(
+				_mm512_mullo_epi64(
+					_mm512_broadcast_i64x2(CrossVec1),
+					DotVec
+				),
+				_mm512_mullo_epi64(
+					_mm512_broadcast_i64x2(CrossVec2),
+					_mm512_alignr_epi8(DotVec, DotVec, 8)
+				)
+			);
+			// ( U,V >= 0 )
+			const __mmask8 UVTests = _mm512_cmpge_epi64_mask(
+				UVs,
+				_mm512_setzero_si512()
+			);
+			const __m256i UVAreas = _mm512_hadd_epi64(UVs);
+			// ( U + V <= Area )
+			const __mmask8 UVAreaTests = _mm256_cmpgt_epi64_mask(
+				_mm256_set1_epi64x(Area),
+				UVAreas
+			);
+			Dest[x + 0] |= ( ( 0b01 << 0 & UVTests ) && ( 1 << 0 & UVAreaTests ) );
+			Dest[x + 1] |= ( ( 0b01 << 2 & UVTests ) && ( 1 << 1 & UVAreaTests ) );
+			Dest[x + 2] |= ( ( 0b01 << 4 & UVTests ) && ( 1 << 2 & UVAreaTests ) );
+			Dest[x + 3] |= ( ( 0b01 << 6 & UVTests ) && ( 1 << 3 & UVAreaTests ) );
+			CurPoint = _mm_add_epi64(
+				CurPoint,
+				_mm_set_epi64x(0, 4)
+			);
+		}
+		#endif
 		// Two samples at a time
-		for( std::size_t i = 0; i < Width / 2; ++i, x += 2 )
+		for( std::size_t i = 0; i < (Width - x) / 2; ++i, x += 2 )
 		{
 			const __m256i V2 = _mm256_sub_epi64(
 				_mm256_set_m128i(
@@ -516,24 +611,24 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				)
 			);
 
-			//    CrossVec1       CrossVec2
-			//       |     DotVec    |     DotVec(Reversed)
-			//       |       |       |       |
-			//       V       V       V       V
-			//U = (Dot11 * Dot02 - Dot01 * Dot12);
-			//V = (Dot00 * Dot12 - Dot01 * Dot02);
+			//     CrossVec1       CrossVec2
+			//        |     DotVec    |     DotVec(Reversed)
+			//        |       |       |       |
+			//        V       V       V       V
+			// U = ( Dot11 * Dot02 - Dot01 * Dot12 );
+			// V = ( Dot00 * Dot12 - Dot01 * Dot02 );
 			const __m256i UV = _mm256_sub_epi64(
-				_mm256_mul_epi32(
+				_mm256_mullo_epi64(
 					_mm256_broadcastsi128_si256(CrossVec1),
 					DotVec
 				),
-				_mm256_mul_epi32(
+				_mm256_mullo_epi64(
 					_mm256_broadcastsi128_si256(CrossVec2),
 					_mm256_alignr_epi8(DotVec, DotVec, 8)
 				)
 			);
 			// ( x >= 0 ) ⇒ ¬( X < 0 ) ⇒ ¬( 0 > X )
-			const __m256i UVTests = _mm256_cmpgt_epi32(
+			const __m256i UVTests = _mm256_cmpgt_epi64(
 				_mm256_setzero_si256(),
 				UV
 			);
@@ -547,7 +642,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					_mm_set1_epi64x(0xFFFFFFFF),
 					_mm256_extracti128_si256(UVTests,0)
 				)
-				&& _mm_extract_epi64(UVAreaTests,0) == -1
+				&& _mm_extract_epi64(UVAreaTests, 0) == -1
 			);
 			Dest[x + 1] |= (
 				_mm_testz_si128(
@@ -579,16 +674,17 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U = (Dot11 * Dot02 - Dot01 * Dot12);
 			// V = (Dot00 * Dot12 - Dot01 * Dot02);
 			const __m128i UV = _mm_sub_epi64(
-				_mm_mul_epi32(
+				_mm_mullo_epi64(
 					CrossVec1,
 					DotVec
 				),
-				_mm_mul_epi32(
+				_mm_mullo_epi64(
 					CrossVec2,
 					_mm_alignr_epi8(DotVec,DotVec,8)
 				)
 			);
 			// ( x >= 0 ) ⇒ ¬( X < 0 )
+			// NOTE: _mm_cmplt_epi64 is AVX512 only
 			const __m128i UVTest = _mm_cmplt_epi32(
 				UV,
 				_mm_setzero_si128()
@@ -701,6 +797,7 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 		CurPoint = vset_lane_s32(
 			XBounds.first,
 			CurPoint,
+
 			0
 		);
 	}
@@ -732,18 +829,18 @@ const std::vector<
 		const char*
 	>
 > FillAlgorithms = {
-// Cross-Product methods
-	{ SerialBlit<CrossTest>,   "Serial-CrossProduct"         },
-	{ CrossFill,               "Serial-CrossProductFill"     },
+	// Cross-Product methods
+	{SerialBlit<CrossTest>, "Serial-CrossProduct"},
+	{CrossFill, "Serial-CrossProductFill"},
 #ifdef __AVX2__
 	{ CrossFillAVX2,           "Serial-CrossProductFillAVX2" },
 #endif
 #ifdef __ARM_NEON
 	{ CrossFillNEON,           "Serial-CrossProductFillNEON" },
 #endif
-// Barycentric methods
-	{ SerialBlit<Barycentric>, "Serial-Barycentric"          },
-	{ BarycentricFill,         "Serial-BarycentricFill"      },
+	// Barycentric methods
+	{SerialBlit<Barycentric>, "Serial-Barycentric"},
+	{BarycentricFill, "Serial-BarycentricFill"},
 #ifdef __AVX2__
 	{ BarycentricFillAVX2,     "Serial-BarycentricFillAVX2"  },
 #endif
