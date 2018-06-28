@@ -416,7 +416,7 @@ inline std::int64_t _mm_hadd_epi64(const __m128i A)
 }
 
 // SSE4.1
-inline std::int32_t _mm_dot_epi64(const __m128i A, const __m128i B)
+inline std::int64_t _mm_dot_epi64(const __m128i A, const __m128i B)
 {
 	return _mm_hadd_epi64(
 		_mm_mul_epi32(
@@ -461,9 +461,9 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	const __m128i V0 = _mm_sub_epi64(CurTri[2], CurTri[0]);
 	const __m128i V1 = _mm_sub_epi64(CurTri[1], CurTri[0]);
 
-	const std::int32_t Dot00 = _mm_dot_epi64(V0, V0);
-	const std::int32_t Dot01 = _mm_dot_epi64(V0, V1);
-	const std::int32_t Dot11 = _mm_dot_epi64(V1, V1);
+	const std::int64_t Dot00 = _mm_dot_epi64(V0, V0);
+	const std::int64_t Dot01 = _mm_dot_epi64(V0, V1);
+	const std::int64_t Dot11 = _mm_dot_epi64(V1, V1);
 	const __m128i CrossVec1 = _mm_set_epi64x(
 		Dot00,
 		Dot11
@@ -473,7 +473,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		Dot01
 	);
 
-	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
+	const std::int64_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
