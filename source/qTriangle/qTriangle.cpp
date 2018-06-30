@@ -82,15 +82,83 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	__m256i CurPoint = _mm256_set1_epi64x(
-		(static_cast<std::int64_t>(YBounds.first) << 32)
-		| static_cast<std::int32_t>(XBounds.first)
+	__m256i CurPoint = _mm256_set_epi32(
+		YBounds.first, XBounds.first,
+		YBounds.first, XBounds.first,
+		YBounds.first, XBounds.first,
+		YBounds.first, XBounds.first
 	);
 	// Left-most point of current scanline
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Rasterize Scanline
-		for( std::size_t x = 0; x < Width; ++x )
+		std::size_t x = 0;
+
+		#if defined(__AVX512F__) || defined(_MSC_VER)
+		// Two samples at a time
+		for( std::size_t i = 0; i < (Width - x) / 2; ++i, x += 2 )
+		{
+			const __m512i PointDir = _mm512_sub_epi32(
+				_mm512_add_epi64(
+					_mm512_broadcast_i32x8(CurPoint),
+					_mm512_set_epi32(
+						0, 1, 0, 1, // 
+						0, 1, 0, 1, // NextPoint
+						0, 0, 0, 0, // 
+						0, 0, 0, 0  // Current Point
+					),
+				),
+				_mm512_broadcast_i32x8(TriVerts120)
+			);
+
+			// Compute Z-components of cross products in parallel
+			// Tests three `DirA.x * DirB.y - DirA.y * DirB.x`
+			// values at once
+
+			// Swap XY Values of Vector B's elements (int32_t)
+			// A: [ ~ | ~ | X2 | Y2 | X1 | Y1 | X0 | Y0 ]
+			// B: [ ~ | ~ | Y2 | X2 | Y1 | X1 | Y0 | X0 ]
+			const __m512i Product = _mm512_mullo_epi32(
+				_mm512_broadcast_i32x8(TriDirections),
+				// Shuffles the two 128-bit lanes
+				_mm512_shuffle_epi32(
+					PointDir,
+					_MM_SHUFFLE(2, 3, 0, 1)
+				)
+			);
+
+			// Shift Y values into X value columns
+			const __m512i Lower = _mm512_srli_epi64(
+				Product,
+				32
+			);
+			// Get Z component of cross product
+			const __m512i CrossAreas = _mm512_sub_epi32(
+				Product,
+				Lower
+			);
+			// Check if `X >= 0` for each of the 3 Z-components 
+			// ( x >= 0 ) ⇒ ¬( X < 0 )
+			const auto Test = _mm512_cmpge_epi32_mask(
+				CrossAreas,
+				_mm512_setzero_si512()
+			);
+			Dest[x+0] |= ( Test & 0b00010101 << 0 ) == 0b00010101 << 0;
+			Dest[x+1] |= ( Test & 0b00010101 << 8 ) == 0b00010101 << 8;
+			// Increment to next column
+			CurPoint = _mm256_add_epi32(
+				CurPoint,
+				_mm256_set_epi32(
+					0, 2,
+					0, 2,
+					0, 2,
+					0, 2
+				)
+			);
+		}
+		#endif
+		// Serial
+		for( ; x < Width; ++x )
 		{
 			const __m256i PointDir = _mm256_sub_epi32(
 				CurPoint,
@@ -134,13 +202,23 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			// Increment to next column
 			CurPoint = _mm256_add_epi32(
 				CurPoint,
-				_mm256_set1_epi64x(1)
+				_mm256_set_epi32(
+					0, 1,
+					0, 1,
+					0, 1,
+					0, 1
+				)
 			);
 		}
 		// Increment to next Scanline
 		CurPoint = _mm256_add_epi32(
 			CurPoint,
-			_mm256_set1_epi64x(1L << 32)
+			_mm256_set_epi32(
+				1, 0,
+				1, 0,
+				1, 0,
+				1, 0
+			)
 		);
 		// Move CurPoint back to the left of the scanline
 		CurPoint = _mm256_blend_epi32(
@@ -567,14 +645,14 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 			const __m256i UVAreas = _mm512_hadd_epi64(UVs);
 			// ( U + V <= Area )
-			const __mmask8 UVAreaTests = _mm256_cmpgt_epi64_mask(
+			const __mmask8 UVAreaTests = _mm256_cmpge_epi64_mask(
 				_mm256_set1_epi64x(Area),
 				UVAreas
 			);
-			Dest[x + 0] |= ( ( 0b01 << 0 & UVTests ) && ( 1 << 0 & UVAreaTests ) );
-			Dest[x + 1] |= ( ( 0b01 << 2 & UVTests ) && ( 1 << 1 & UVAreaTests ) );
-			Dest[x + 2] |= ( ( 0b01 << 4 & UVTests ) && ( 1 << 2 & UVAreaTests ) );
-			Dest[x + 3] |= ( ( 0b01 << 6 & UVTests ) && ( 1 << 3 & UVAreaTests ) );
+			Dest[x + 0] |= ( ( 0b11 << 0 & UVTests ) && ( 0b01 << 0 & UVAreaTests ) );
+			Dest[x + 1] |= ( ( 0b11 << 2 & UVTests ) && ( 0b01 << 1 & UVAreaTests ) );
+			Dest[x + 2] |= ( ( 0b11 << 4 & UVTests ) && ( 0b01 << 2 & UVAreaTests ) );
+			Dest[x + 3] |= ( ( 0b11 << 6 & UVTests ) && ( 0b01 << 3 & UVAreaTests ) );
 			CurPoint = _mm_add_epi64(
 				CurPoint,
 				_mm_set_epi64x(0, 4)
@@ -656,7 +734,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				_mm_set_epi64x(0, 2)
 			);
 		}
-		// Serial-ish
+		// Serial
 		for( ; x < Width; ++x )
 		{
 			const __m128i V2 = _mm_sub_epi64(CurPoint,CurTri[0]);
@@ -849,3 +927,4 @@ const std::vector<
 #endif
 };
 }
+
