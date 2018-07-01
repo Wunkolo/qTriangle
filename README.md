@@ -117,4 +117,17 @@ Subtractions|Multiplications|Comparisons
 
 # Barycentric Coordinate Method
 
+With some barycentric coordinate trickery one can drive a coordiante system that allows a triangle to be described as two independent vectors and two scalars that describe each vectors "contribution" to a final location.
+
+The two vectors actually generally describe a plane while the two scalars are typically denoted as *U* and *V*.
+Since a triangle has three points, these two vectors can be drives by picking any one point of the triangle and obtaining two directional vectors from this point to the other points.
+The *U* and *V* scalar values are typically normalized within the [0.0,1.0] range to easily translate these values into *percentages* that determine how much much the two vectors should contribute to the resulting vector.
+Ex, if I had the two directional vectors `( 9, 2 )` and `( 7, 1 )` and the `U` `V` values `0.5` `1.4` respectively. The resulting point is ` ( 9, 2 ) * 0.5 + ( 7, 1 )` which in english would be something like `I want 50% of ( 9, 2 ) and 140% of ( 7, 1 )`.
+
+The actual *triangle shape* is made by constraining the `U` and `V` values so that rather than describing a plane very genreally it instead will define the bounds of a triangle. The first two constraints are `U >= 0` and `V >= 0` which guarentee that the U,V coordinates are always on the *positive* side of the two vectors and do not go backwards. The third constraint is `U + V <= 1` is [just the line](http://www.wolframalpha.com/input/?i=1+-+x+-+y++%3D+0) `y = 1 - x` [turned into an inequality](http://www.wolframalpha.com/input/?i=1+-+x+-+y++%3D%3E+0) such that all solutions to the inequality equate to a point within a triangle.
+
+Given a triangle, the two directional vectors are easy to calculate. Pick any of the three points of a triangle, get the vector direction from this point, to the two other points ( which is just a vector subtraction). After the two directional vectors are obtained, now all that has to be done to see if a point is within a triangle is [*projecting*](https://en.wikipedia.org/wiki/Vector_projection) this point against the two directional vectors to get the *U* and *V* values to test against the three conditions.
+
+Projecting a point against these two vectors to get the *U* and *V* values is but trivial dot-product arithmetic. First, another directional vector has to be created as a positional-vector and a directional-vector wouldn't make sense in this instance. The very same point that was selected to in step 1 to generate the first two directional vectors must be used once more to generate a third directional vector between this triangle vertex and the point being sampled against (another vector subtraction). This new vector will then be dot-product-ed against the two directional edges ( vertial vector multiplication and horizontal addition ) to finally determine the `U` and `V` values to test against `U >= 0`, `V >= 0`, and `U + V <= 1`.
+
 ![](media/BarycentricMethod.gif)
