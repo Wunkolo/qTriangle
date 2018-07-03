@@ -130,9 +130,53 @@ This is just a linear combination of three points, but `p'` isnt meant to just b
 
 In this case though. **We already have `p'` and want to determine if it is within this triangle!** Time to cleverly work backwards!
 
-So given a `p1`, `p2`, `p3` and `p'`, you have to figure out the three unknowns `w1`, `w2`, `w3` .
+---
 
-You could always just use the distance formula from `p'` to the others and invert it to get weights, and check it against the convex combination conditions to see if its within the triangle.
+So given a `p1`, `p2`, `p3` and `p'`, you have to figure out the three positive unknowns `w1`, `w2`, `w3` that balance. Some linear alg!
+
+```
+w1 >= 0   w2 >= 0   w3 >= 0
+
+1 = w1 + w2 + w3
+
+p' = w1 * p1 + w2 * p2 + w3 * p3
+```
+How about expanding our vectors into their individual(2D) dimensions.
+
+```
+w1 >= 0   w2 >= 0   w3 >= 0
+
+p'_x = w1 * p1_x + w2 * p2_x + w3 * p3_x
+
+p'_y = w1 * p1_y + w2 * p2_y + w3 * p3_y
+
+   1 = w1    +     w2     +    w3
+```
+Now that looks like a matrix! Take out all those weights and put it into a vector!
+```
+w1 >= 0   w2 >= 0   w3 >= 0
+
+[ p'_x ] = [ p1_x p2_x p3_x ]   [ w1 ]
+[ p'_y ] = [ p1_y p2_y p3_y ] * [ w2 ]
+[    1 ] = [    1    1    1 ]   [ w3 ]
+```
+So the solution is to invert that 3x3 matrix there and multiplying it by the point we are testing it against to get the resulting three weights. And once you get the three weights. All you have to do is test if they are positive(**Note**: Yes! this is absolutely a derivation of the cross-product method at this point)
+```
+w1 >= 0   w2 >= 0   w3 >= 0
+
+         ( [ p1_x p2_x p3_x ] )   [ p'_x ] = [ w1 ]
+  inverse( [ p1_y p2_y p3_y ] ) * [ p'_y ] = [ w2 ]
+         ( [    1    1    1 ] )   [    1 ] = [ w3 ]
+
+This is where it gets a little hairy
+
+Det = 1/(p1_y * (p3_x - p2_x) + p1_x * (p2_y - p3_y) - p2_y * p3_x + p2_x * p3_y)
+
+  1    [ (p2_y - p3_y) (p3_x - p2_x) (p2_x p3_y - p2_y p3_x) ]   [ p'_x ] = [ w1 ]
+  -  * [ (p3_y - p1_y) (p1_x - p3_x) (p1_y p3_x - p1_x p3_y) ] * [ p'_y ] = [ w2 ]
+ Det   [ (p1_y - p2_y) (p2_x - p1_x) (p1_x p2_y - p1_y p2_x) ]   [    1 ] = [ w3 ]
+```
+
 
 ---
 
