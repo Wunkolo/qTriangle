@@ -141,31 +141,19 @@ How about expanding those vectors into their individual(2D) dimensions.
 <img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w1&space;>=&space;0\\w2&space;>=&space;0\\w3&space;>=&space;0\\&space;p'_x&space;=&space;w_1&space;*&space;p_1_x&space;&plus;&space;w_2&space;*&space;p_2_x&space;&plus;&space;w_3&space;*&space;p_3_x\\&space;p'_y&space;=&space;w_1&space;*&space;p_1_y&space;&plus;&space;w_2&space;*&space;p_2_y&space;&plus;&space;w_3&space;*&space;p_3_y\\&space;1&space;=&space;w_1&space;&plus;&space;w_2&space;&plus;&space;w_3\\" title="\\w1 >= 0\\w2 >= 0\\w3 >= 0\\ p'_x = w_1 * p_1_x + w_2 * p_2_x + w_3 * p_3_x\\ p'_y = w_1 * p_1_y + w_2 * p_2_y + w_3 * p_3_y\\ 1 = w_1 + w_2 + w_3\\" />
 
 Now that looks like a matrix! Take out all those weights and put it into a vector!
-```
-w1 >= 0   w2 >= 0   w3 >= 0
 
-[ p'_x ] = [ p1_x | p2_x | p3_x ]   [ w1 ]
-[ p'_y ] = [ p1_y | p2_y | p3_y ] * [ w2 ]
-[    1 ] = [    1 |    1 |    1 ]   [ w3 ]
-```
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w_1&space;>=&space;0\\w_2&space;>=&space;0\\w_3&space;>=&space;0\\&space;\begin{bmatrix}&space;p'_x\\&space;p'_y\\&space;1\\&space;\end{bmatrix}&space;=&space;\begin{bmatrix}&space;p_1_x&space;&&space;p_2_x&space;&&space;p_3_x&space;\\&space;p_1_y&space;&&space;p_2_y&space;&&space;p_3_y&space;\\&space;1&space;&&space;1&space;&&space;1&space;\end{bmatrix}&space;*&space;\begin{bmatrix}&space;w_1\\&space;w_2\\&space;w_3\\&space;\end{bmatrix}" title="\\w_1 >= 0\\w_2 >= 0\\w_3 >= 0\\ \begin{bmatrix} p'_x\\ p'_y\\ 1\\ \end{bmatrix} = \begin{bmatrix} p_1_x & p_2_x & p_3_x \\ p_1_y & p_2_y & p_3_y \\ 1 & 1 & 1 \end{bmatrix} * \begin{bmatrix} w_1\\ w_2\\ w_3\\ \end{bmatrix}" />
+
 So the solution is to invert that 3x3 matrix there and multiplying it by the point we are testing it against to get the resulting three weights. And once you get the three weights. All you have to do is test if they are positive(**Note**: Yes! this is absolutely a derivation of the cross-product method at this point)
-```
-w1 >= 0   w2 >= 0   w3 >= 0
 
-         ( [ p1_x | p2_x | p3_x ] )   [ p'_x ] = [ w1 ]
-  inverse( [ p1_y | p2_y | p3_y ] ) * [ p'_y ] = [ w2 ]
-         ( [    1 |    1 |    1 ] )   [    1 ] = [ w3 ]
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w_1&space;>=&space;0\\w_2&space;>=&space;0\\w_3&space;>=&space;0\\&space;\&space;\begin{bmatrix}&space;p_1_x&space;&&space;p_2_x&space;&&space;p_3_x&space;\\&space;p_1_y&space;&&space;p_2_y&space;&&space;p_3_y&space;\\&space;1&space;&&space;1&space;&&space;1&space;\end{bmatrix}&space;^{-1}&space;*&space;\begin{bmatrix}&space;p'_x\\&space;p'_y\\&space;1\\&space;\end{bmatrix}&space;=&space;\begin{bmatrix}&space;w_1\\&space;w_2\\&space;w_3\\&space;\end{bmatrix}" title="\\w_1 >= 0\\w_2 >= 0\\w_3 >= 0\\ \ \begin{bmatrix} p_1_x & p_2_x & p_3_x \\ p_1_y & p_2_y & p_3_y \\ 1 & 1 & 1 \end{bmatrix} ^{-1} * \begin{bmatrix} p'_x\\ p'_y\\ 1\\ \end{bmatrix} = \begin{bmatrix} w_1\\ w_2\\ w_3\\ \end{bmatrix}" />
 
 Matrix inverse... This is where it gets a little hairy
 
-Det = 1/(p1_y * (p3_x - p2_x) + p1_x * (p2_y - p3_y) - p2_y * p3_x + p2_x * p3_y)
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w_1&space;>=&space;0\\w_2&space;>=&space;0\\w_3&space;>=&space;0\\&space;\&space;Det&space;=&space;(p_1_y&space;*&space;(p_3_x&space;-&space;p_2_x)&space;&plus;&space;p_1_x&space;*&space;(p_2_y&space;-&space;p_3_y)&space;-&space;p_2_y&space;*&space;p_3_x&space;&plus;&space;p_2_x&space;*&space;p_3_y)\\&space;\\&space;\frac{1}{Det}&space;*&space;\begin{bmatrix}&space;p_2_y&space;-&space;p3_y&space;&&space;p_3_x&space;-&space;p_2_x&space;&&space;p_2_x&space;*&space;p_3_y&space;-&space;p_2_y&space;*&space;p_3_x&space;\\&space;p_3_y&space;-&space;p1_y&space;&&space;p_1_x&space;-&space;p_3_x&space;&&space;p_1_y&space;*&space;p_3_x&space;-&space;p_1_x&space;*&space;p_3_y&space;\\&space;p_1_y&space;-&space;p2_y&space;&&space;p_2_x&space;-&space;p_1_x&space;&&space;p_1_x&space;*&space;p_2_y&space;-&space;p_1_y&space;*&space;p_2_x&space;\\&space;\end{bmatrix}&space;*&space;\begin{bmatrix}&space;p'_x\\&space;p'_y\\&space;1\\&space;\end{bmatrix}&space;=&space;\begin{bmatrix}&space;w_1\\&space;w_2\\&space;w_3\\&space;\end{bmatrix}" title="\\w_1 >= 0\\w_2 >= 0\\w_3 >= 0\\ \ Det = (p_1_y * (p_3_x - p_2_x) + p_1_x * (p_2_y - p_3_y) - p_2_y * p_3_x + p_2_x * p_3_y)\\ \\ \frac{1}{Det} * \begin{bmatrix} p_2_y - p3_y & p_3_x - p_2_x & p_2_x * p_3_y - p_2_y * p_3_x \\ p_3_y - p1_y & p_1_x - p_3_x & p_1_y * p_3_x - p_1_x * p_3_y \\ p_1_y - p2_y & p_2_x - p_1_x & p_1_x * p_2_y - p_1_y * p_2_x \\ \end{bmatrix} * \begin{bmatrix} p'_x\\ p'_y\\ 1\\ \end{bmatrix} = \begin{bmatrix} w_1\\ w_2\\ w_3\\ \end{bmatrix}" />
 
-  1    [ (p2_y - p3_y) | (p3_x - p2_x) | (p2_x p3_y - p2_y p3_x) ]   [ p'_x ] = [ w1 ]
-  -  * [ (p3_y - p1_y) | (p1_x - p3_x) | (p1_y p3_x - p1_x p3_y) ] * [ p'_y ] = [ w2 ]
- Det   [ (p1_y - p2_y) | (p2_x - p1_x) | (p1_x p2_y - p1_y p2_x) ]   [    1 ] = [ w3 ]
-```
 
-And with this, `w1`, `w2`, and `w3` all reduce to simple linear equations and all that would have to be checked is if they are greater than 0:
+And with this, `w1`, `w2`, and `w3` all reduce to simple linear equations and all that would have to be checked is if they are greater than `0`!
 
 
 ---
