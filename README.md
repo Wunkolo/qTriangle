@@ -124,9 +124,7 @@ Using these three points, any new point `p'` within this triangle can be generat
 `p' = w1 * p1 + w2 * p2 + w3 * p3`.
 This is just a linear combination of three points, but `p'` isnt meant to just be any wild combination of three points. What you actually want is for the combination of three points to always land on the triangular surface that they all contain. This is called a [convex combination](https://en.wikipedia.org/wiki/Convex_combination) where if you want to only reach every point within this triangle then you must bind these three weights to the conditions of being non-negative and also summing to `1`. Making this the full barycentric equation for a triangle defined by three points:
 
-`w1 >= 0`, `w2 >= 0`, `w3 >= 0`, `w1 + w2 + w3 = 1`
-
-`p' = w1 * p1 + w2 * p2 + w3 * p3`
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w_1&space;>=&space;0\\w_2&space;>=&space;0\\w_3&space;>=&space;0\\&space;p'&space;=&space;w_1&space;*&space;p_1&space;&plus;&space;w_2&space;*&space;p_2&space;&plus;&space;w_3&space;*&space;p_3\\&space;1&space;=&space;w_1&space;&plus;&space;w_2&space;&plus;&space;w_3\\&space;%&space;p'_x&space;=&space;w_1&space;*&space;p_1_x&space;&plus;&space;w_2&space;*&space;p_2_x&space;&plus;&space;w_3&space;*&space;p_3_x\\&space;p'_y&space;=&space;w_1&space;*&space;p_1_y&space;&plus;&space;w_2&space;*&space;p_2_y&space;&plus;&space;w_3&space;*&space;p_3_y\\" title="\\w_1 >= 0\\w_2 >= 0\\w_3 >= 0\\ p' = w_1 * p_1 + w_2 * p_2 + w_3 * p_3\\ 1 = w_1 + w_2 + w_3\\ % p'_x = w_1 * p_1_x + w_2 * p_2_x + w_3 * p_3_x\\ p'_y = w_1 * p_1_y + w_2 * p_2_y + w_3 * p_3_y\\" />
 
 In this case though. **We already have `p'` and want to determine if it is within this triangle!** Time to cleverly work backwards!
 
@@ -134,48 +132,40 @@ In this case though. **We already have `p'` and want to determine if it is withi
 
 So given a `p1`, `p2`, `p3` and `p'`, you have to figure out the three positive unknowns `w1`, `w2`, `w3` that balance. Some linear alg!
 
-```
-w1 >= 0   w2 >= 0   w3 >= 0
+So starting with this:
 
-1 = w1 + w2 + w3
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w_1&space;>=&space;0\\w_2&space;>=&space;0\\w_3&space;>=&space;0\\&space;p'&space;=&space;w_1&space;*&space;p_1&space;&plus;&space;w_2&space;*&space;p_2&space;&plus;&space;w_3&space;*&space;p_3\\&space;1&space;=&space;w_1&space;&plus;&space;w_2&space;&plus;&space;w_3\\&space;%&space;p'_x&space;=&space;w_1&space;*&space;p_1_x&space;&plus;&space;w_2&space;*&space;p_2_x&space;&plus;&space;w_3&space;*&space;p_3_x\\&space;p'_y&space;=&space;w_1&space;*&space;p_1_y&space;&plus;&space;w_2&space;*&space;p_2_y&space;&plus;&space;w_3&space;*&space;p_3_y\\" title="\\w_1 >= 0\\w_2 >= 0\\w_3 >= 0\\ p' = w_1 * p_1 + w_2 * p_2 + w_3 * p_3\\ 1 = w_1 + w_2 + w_3\\ % p'_x = w_1 * p_1_x + w_2 * p_2_x + w_3 * p_3_x\\ p'_y = w_1 * p_1_y + w_2 * p_2_y + w_3 * p_3_y\\" />
 
-p' = w1 * p1 + w2 * p2 + w3 * p3
-```
-How about expanding our vectors into their individual(2D) dimensions.
+How about expanding those vectors into their individual(2D) dimensions.
 
-```
-w1 >= 0   w2 >= 0   w3 >= 0
+<img src="https://latex.codecogs.com/png.latex?\dpi{150}&space;\\w1&space;>=&space;0\\w2&space;>=&space;0\\w3&space;>=&space;0\\&space;p'_x&space;=&space;w_1&space;*&space;p_1_x&space;&plus;&space;w_2&space;*&space;p_2_x&space;&plus;&space;w_3&space;*&space;p_3_x\\&space;p'_y&space;=&space;w_1&space;*&space;p_1_y&space;&plus;&space;w_2&space;*&space;p_2_y&space;&plus;&space;w_3&space;*&space;p_3_y\\&space;1&space;=&space;w_1&space;&plus;&space;w_2&space;&plus;&space;w_3\\" title="\\w1 >= 0\\w2 >= 0\\w3 >= 0\\ p'_x = w_1 * p_1_x + w_2 * p_2_x + w_3 * p_3_x\\ p'_y = w_1 * p_1_y + w_2 * p_2_y + w_3 * p_3_y\\ 1 = w_1 + w_2 + w_3\\" />
 
-p'_x = w1 * p1_x + w2 * p2_x + w3 * p3_x
-
-p'_y = w1 * p1_y + w2 * p2_y + w3 * p3_y
-
-   1 = w1    +     w2     +    w3
-```
 Now that looks like a matrix! Take out all those weights and put it into a vector!
 ```
 w1 >= 0   w2 >= 0   w3 >= 0
 
-[ p'_x ] = [ p1_x p2_x p3_x ]   [ w1 ]
-[ p'_y ] = [ p1_y p2_y p3_y ] * [ w2 ]
-[    1 ] = [    1    1    1 ]   [ w3 ]
+[ p'_x ] = [ p1_x | p2_x | p3_x ]   [ w1 ]
+[ p'_y ] = [ p1_y | p2_y | p3_y ] * [ w2 ]
+[    1 ] = [    1 |    1 |    1 ]   [ w3 ]
 ```
 So the solution is to invert that 3x3 matrix there and multiplying it by the point we are testing it against to get the resulting three weights. And once you get the three weights. All you have to do is test if they are positive(**Note**: Yes! this is absolutely a derivation of the cross-product method at this point)
 ```
 w1 >= 0   w2 >= 0   w3 >= 0
 
-         ( [ p1_x p2_x p3_x ] )   [ p'_x ] = [ w1 ]
-  inverse( [ p1_y p2_y p3_y ] ) * [ p'_y ] = [ w2 ]
-         ( [    1    1    1 ] )   [    1 ] = [ w3 ]
+         ( [ p1_x | p2_x | p3_x ] )   [ p'_x ] = [ w1 ]
+  inverse( [ p1_y | p2_y | p3_y ] ) * [ p'_y ] = [ w2 ]
+         ( [    1 |    1 |    1 ] )   [    1 ] = [ w3 ]
 
-This is where it gets a little hairy
+Matrix inverse... This is where it gets a little hairy
 
 Det = 1/(p1_y * (p3_x - p2_x) + p1_x * (p2_y - p3_y) - p2_y * p3_x + p2_x * p3_y)
 
-  1    [ (p2_y - p3_y) (p3_x - p2_x) (p2_x p3_y - p2_y p3_x) ]   [ p'_x ] = [ w1 ]
-  -  * [ (p3_y - p1_y) (p1_x - p3_x) (p1_y p3_x - p1_x p3_y) ] * [ p'_y ] = [ w2 ]
- Det   [ (p1_y - p2_y) (p2_x - p1_x) (p1_x p2_y - p1_y p2_x) ]   [    1 ] = [ w3 ]
+  1    [ (p2_y - p3_y) | (p3_x - p2_x) | (p2_x p3_y - p2_y p3_x) ]   [ p'_x ] = [ w1 ]
+  -  * [ (p3_y - p1_y) | (p1_x - p3_x) | (p1_y p3_x - p1_x p3_y) ] * [ p'_y ] = [ w2 ]
+ Det   [ (p1_y - p2_y) | (p2_x - p1_x) | (p1_x p2_y - p1_y p2_x) ]   [    1 ] = [ w3 ]
 ```
+
+And with this, `w1`, `w2`, and `w3` all reduce to simple linear equations and all that would have to be checked is if they are greater than 0:
 
 
 ---
