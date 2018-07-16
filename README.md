@@ -155,6 +155,35 @@ Matrix inverse... This is where it gets a little hairy
 
 And with this, `w1`, `w2`, and `w3` all reduce to relatively "simple" linear equations and all that would have to be checked is if they are greater than `0`!
 
+Here is the equivalent code in GLSL
+```c
+bool PointInTriangleBarycentric(
+    in vec2 Triangle[3],
+    in vec2 Point
+)
+{
+    mat3 Barycentric = inverse(
+        mat3(
+    		Triangle[0],1.0,
+        	Triangle[1],1.0,
+        	Triangle[2],1.0
+    	)
+    );
+    
+    vec3 Weights = Barycentric * vec3(Point,1.0);
+    
+    if(
+        Weights.x >= 0.0 &&
+        Weights.y >= 0.0 &&
+        Weights.z >= 0.0
+    )
+    {
+        return true;
+    }
+    return false;
+}
+```
+
 ---
 
 The two directional vectors are derived from three points that describe a plane while the two scalars are typically denoted as *U* and *V* and determine how much these two directional vectors should mix together to create another point on this plane.
