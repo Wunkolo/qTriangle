@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
+#include <glm/gtx/scalar_relational.hpp>
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -19,7 +20,7 @@ namespace qTri
 // Get Cross-Product Z component from two directiona vectors
 inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
 {
-	return DirA.x * DirB.y - DirA.y * DirB.x;
+		return DirA.x * DirB.y - DirA.y * DirB.x;
 }
 
 // Cross-product test against each edge, ensuring the area
@@ -27,17 +28,20 @@ inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
 // Requires that the triangle is in clockwise order
 bool CrossTest(const Vec2& Point, const Triangle& Tri)
 {
-	return
-		CrossArea(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]) >= 0 &&
-		CrossArea(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]) >= 0 &&
-		CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]) >= 0;
+		return
+				CrossArea(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]) >= 0 &&
+				CrossArea(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]) >= 0 &&
+				CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]) >= 0;
 }
 
 void CrossFill(Image& Frame, const Triangle& Tri)
 {
-	const Vec2 DirectionBA = Tri.Vert[1] - Tri.Vert[0];
-	const Vec2 DirectionCB = Tri.Vert[2] - Tri.Vert[1];
-	const Vec2 DirectionAC = Tri.Vert[0] - Tri.Vert[2];
+	const Vec2 EdgeDir[3] = {
+		Tri.Vert[1] - Tri.Vert[0],
+		Tri.Vert[2] - Tri.Vert[1],
+		Tri.Vert[0] - Tri.Vert[2]
+	};
+
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
@@ -46,11 +50,24 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 	{
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			const bool Inside =
-				CrossArea(DirectionBA, CurPoint - Tri.Vert[1]) >= 0 &&
-				CrossArea(DirectionCB, CurPoint - Tri.Vert[2]) >= 0 &&
-				CrossArea(DirectionAC, CurPoint - Tri.Vert[0]) >= 0;
-			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= Inside;
+			const Vec2 PointDir[3] = {
+				CurPoint - Tri.Vert[0],
+				CurPoint - Tri.Vert[1],
+				CurPoint - Tri.Vert[2]
+			};
+
+			const glm::i32vec3 Crosses = glm::vec3(
+				CrossArea( EdgeDir[0], PointDir[0] ),
+				CrossArea( EdgeDir[1], PointDir[1] ),
+				CrossArea( EdgeDir[2], PointDir[2] )
+			);
+
+			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= glm::all(
+				glm::greaterThanEqual(
+					Crosses,
+					glm::i32vec3(0)
+				)
+			);
 		}
 	}
 }
