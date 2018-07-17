@@ -60,7 +60,7 @@ EdgeDir2.x * PointDir2.y - EdgeDir2.y * PointDir2.x >= 0
 
 The full pseudo-code:
 ```cpp
-// Point       - Position that is being tested
+// Point	   - Position that is being tested
 // Vertex0,1,2 - Vertices of the triangle in **clockwise order**
 
 // Directional vertices along the edges of the triangle in clockwise order
@@ -155,34 +155,49 @@ Matrix inverse... This is where it gets a little hairy
 
 And with this, `w1`, `w2`, and `w3` all reduce to relatively "simple" linear equations and all that would have to be checked is if they are greater than `0`!
 
-Here is the equivalent code in GLSL
+Here is the equivalent code in GLSL.
 ```c
 bool PointInTriangleBarycentric(
-    in vec2 Triangle[3],
-    in vec2 Point
+	in vec2 Triangle[3],
+	in vec2 Point
 )
 {
-    mat3 Barycentric = inverse(
-        mat3(
-    		Triangle[0],1.0,
-        	Triangle[1],1.0,
-        	Triangle[2],1.0
-    	)
-    );
-    
-    vec3 Weights = Barycentric * vec3(Point,1.0);
-    
-    if(
-        Weights.x >= 0.0 &&
-        Weights.y >= 0.0 &&
-        Weights.z >= 0.0
-    )
-    {
-        return true;
-    }
-    return false;
+	mat3 Barycentric = inverse(
+		mat3(
+			Triangle[0], 1.0f,
+			Triangle[1], 1.0f,
+			Triangle[2], 1.0f
+		)
+	);
+
+	vec3 Weights = Barycentric * vec3( Point, 1.0 );
+
+	if(
+		// Weights.x >= 0.0f &&
+		// Weights.y >= 0.0f &&
+		// Weights.z >= 0.0f
+		all( greaterThanEqual( Weights, vec3(0.0f) ) )
+	)
+	{
+		return true;
+	}
+	
+	return false;
 }
 ```
+
+Though, this is a pretty naive approach. It still has its uses.
+If you wanted to test a million points against a single triangle. You'd have to do a single matrix inverse(pretty expensive!) and then the overhead for testing each individual point you want to test would be: a matrix-vector multiplication(a 3x3 matrix times an ℝ³ vector, which is pretty much just three dot-products) and three comparisons:
+
+Additions|Multiplications|Comparisons
+:-:|:-:|:-:
+6|9|3
+
+A matrix inverse is pretty expensive to do. But this only has to be done once for each triangle. If you find yourself with possibly thousands of triangles then some much more clever optimizations have to take place.
+
+Finding the inverse of a matrix is a pretty expensive operation. Especially in a context of having possibly thousands upon millions of these triangles.
+
+## Optimizations
 
 ---
 
