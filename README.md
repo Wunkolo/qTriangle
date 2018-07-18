@@ -193,11 +193,11 @@ Additions|Multiplications|Comparisons
 :-:|:-:|:-:
 6|9|3
 
-A matrix inverse is pretty expensive to do. But this only has to be done once for each triangle. If you find yourself with possibly thousands of triangles then some much more clever optimizations have to take place.
-
-Finding the inverse of a matrix is a pretty expensive operation. Especially in a context of having possibly thousands upon millions of these triangles.
+Though, a matrix inverse is pretty expensive operation to do. Especially in a context of having possibly thousands upon millions of triangles and a matrix inverse each involving almost dozens of multiplications, additions, and a division on top of it all. Some more clever observations can allow for some slim optimizations. Especially since all that matters is if the weights are positive or not.
 
 ## Optimizations
+
+
 
 ---
 
