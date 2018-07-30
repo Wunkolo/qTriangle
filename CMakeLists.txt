@@ -16,7 +16,6 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 ### Global includes
 include_directories(
 	include
-	extern/glm
 )
 
 ### Optimizations
@@ -29,7 +28,15 @@ elseif( CMAKE_COMPILER_IS_GNUCXX )
 	add_compile_options( -Ofast )
 	add_compile_options( -Wall )
 	add_compile_options( -Wextra )
+	# Force colored diagnostic messages in Ninja's output
+	if( CMAKE_GENERATOR STREQUAL "Ninja" )
+	    add_compile_options( -fdiagnostics-color=always )
+	endif()
 endif()
+
+## GLM
+set( GLM_TEST_ENABLE OFF CACHE BOOL "Build GLM Unit Tests")
+add_subdirectory( extern/glm )
 
 ### Target
 add_library(
