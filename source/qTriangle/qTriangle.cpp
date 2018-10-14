@@ -546,30 +546,6 @@ inline __m128i _mm256_dot_epi64(const __m256i A, const __m256i B)
 	return _mm256_hadd_epi64(Product);
 }
 
-// AVX512
-// Sums 4 64-bit integers in each 128-bit lane
-// Returns the four 64-bit results in a 256-bit register
-inline __m256i _mm512_hadd_epi64(const __m512i A)
-{
-	const __m512i Sum = _mm512_add_epi64(
-		_mm512_unpackhi_epi64(A, A),
-		_mm512_unpacklo_epi64(A, A)
-	);
-	return _mm256_unpacklo_epi64(
-		_mm512_castsi512_si256(Sum),
-		_mm512_extracti64x4_epi64(Sum, 1)
-	);
-}
-
-// AVX512
-// Two concurrent dot-products at once
-// Store the four 64-bit results into a 256-bit register
-inline __m256i _mm512_dot_epi64(const __m512i A, const __m512i B)
-{
-	const __m512i Product = _mm512_mullo_epi64(A, B);
-	return _mm512_hadd_epi64(Product);
-}
-
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// 128-bit vectors composing of two 64-bit values
@@ -607,77 +583,6 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		// Rasterize Scanline
 		std::size_t x = 0;
 
-		#if defined(__AVX512F__) || defined(_MSC_VER)
-		// Four samples at a time
-		for( std::size_t i = 0; i < (Width - x) / 4; ++i, x += 4 )
-		{
-			const __m512i V2 = _mm512_sub_epi64(
-				_mm512_add_epi64(
-					_mm512_broadcast_i64x2(CurPoint),
-					_mm512_set_epi64(
-						0,3, // Fourth  point
-						0,2, // Third   point
-						0,1, // Second  point
-						0,0  // Current point
-					)
-				),
-				_mm512_broadcast_i64x2(CurTri[0])
-			);
-
-			// contains 4 64-bit dot-products for each of the two samples
-			const __m256i Dot02 = _mm512_dot_epi64(_mm512_broadcast_i64x2(V0), V2);
-			const __m256i Dot12 = _mm512_dot_epi64(_mm512_broadcast_i64x2(V1), V2);
-			const __m512i DotVec = _mm512_inserti64x4(
-				_mm512_castsi256_si512(
-					_mm256_unpacklo_epi64(
-						Dot02,
-						Dot12
-					)
-				),
-				_mm256_unpackhi_epi64(
-					Dot02,
-					Dot12
-				),
-				1
-			);
-
-			//     CrossVec1       CrossVec2
-			//        |     DotVec    |     DotVec(Reversed)
-			//        |       |       |       |
-			//        V       V       V       V
-			// U = ( Dot11 * Dot02 - Dot01 * Dot12 );
-			// V = ( Dot00 * Dot12 - Dot01 * Dot02 );
-			const __m512i UVs = _mm512_sub_epi64(
-				_mm512_mullo_epi64(
-					_mm512_broadcast_i64x2(CrossVec1),
-					DotVec
-				),
-				_mm512_mullo_epi64(
-					_mm512_broadcast_i64x2(CrossVec2),
-					_mm512_alignr_epi8(DotVec, DotVec, 8)
-				)
-			);
-			// ( U,V >= 0 )
-			const __mmask8 UVTests = _mm512_cmpge_epi64_mask(
-				UVs,
-				_mm512_setzero_si512()
-			);
-			const __m256i UVAreas = _mm512_hadd_epi64(UVs);
-			// ( U + V <= Area )
-			const __mmask8 UVAreaTests = _mm256_cmpge_epi64_mask(
-				_mm256_set1_epi64x(Area),
-				UVAreas
-			);
-			Dest[x + 0] |= ( ( 0b11 << 0 & UVTests ) && ( 0b01 << 0 & UVAreaTests ) );
-			Dest[x + 1] |= ( ( 0b11 << 2 & UVTests ) && ( 0b01 << 1 & UVAreaTests ) );
-			Dest[x + 2] |= ( ( 0b11 << 4 & UVTests ) && ( 0b01 << 2 & UVAreaTests ) );
-			Dest[x + 3] |= ( ( 0b11 << 6 & UVTests ) && ( 0b01 << 3 & UVAreaTests ) );
-			CurPoint = _mm_add_epi64(
-				CurPoint,
-				_mm_set_epi64x(0, 4)
-			);
-		}
-		#endif
 		// Two samples at a time
 		for( std::size_t i = 0; i < (Width - x) / 2; ++i, x += 2 )
 		{
