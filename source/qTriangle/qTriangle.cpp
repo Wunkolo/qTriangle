@@ -76,6 +76,8 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// Load triangle vertices (assumed clockwise order)
+	// Each 2D point is a pair of 32-bit integers being loaded as
+	// if they were three 64-bit integers
 	const __m256i TriVerts012 = _mm256_maskload_epi64(
 		reinterpret_cast<const long long int*>(&Tri.Vert),
 		_mm256_set_epi64x(0, -1, -1, -1)
@@ -87,7 +89,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 	);
 	// Directional vectors such that each triangle vertex is pointing to
 	// the vertex before it, in counter-clockwise order
-	const __m256i TriDirections = _mm256_sub_epi64(
+	const __m256i TriDirections = _mm256_sub_epi32(
 		TriVerts120,
 		TriVerts012
 	);
