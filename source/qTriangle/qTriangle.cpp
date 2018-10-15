@@ -524,9 +524,9 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
 	// 128-bit vectors composing of four 32-bit values
 	const __m128i CurTri[3] = {
-		_mm_set_epi32( Tri.Vert[0].y, Tri.Vert[0].x, Tri.Vert[0].y, Tri.Vert[0].x ),
-		_mm_set_epi32( Tri.Vert[1].y, Tri.Vert[1].x, Tri.Vert[1].y, Tri.Vert[1].x ),
-		_mm_set_epi32( Tri.Vert[2].y, Tri.Vert[2].x, Tri.Vert[2].y, Tri.Vert[2].x )
+		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[0].y ) << 32 ) | Tri.Vert[0].x ),
+		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[1].y ) << 32 ) | Tri.Vert[1].x ),
+		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[2].y ) << 32 ) | Tri.Vert[2].x )
 	};
 
 	// U and V vectors
