@@ -540,7 +540,6 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 	// [0,dot11,0,dot11]
 	const __m128i Dot11 = _mm_dot2_epi32(V1, V1);
 
-
 	// [0,area,0,area]
 	const __m128i Area = _mm_sub_epi32(
 		_mm_mullo_epi32(Dot00,Dot11),
@@ -607,42 +606,41 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					_mm_alignr_epi8(DotVec,DotVec,8)
 				)
 			);
-			// ( x >= 0 ) ⇒ ¬( X < 0 )
-			// NOTE: _mm_cmplt_epi64 is AVX512 only
+			// ( X >= 0 ) ⇒ ¬( X < 0 )
 			const __m128i UVTest = _mm_cmplt_epi32(
 				UV,
 				_mm_setzero_si128()
+			);
+			const std::uint16_t UVTestMask = 0x0F0F & ~_mm_movemask_epi8(
+				UVTest
 			);
 			const __m128i UVSum = _mm_add_epi32(
 				UV, // [0, V, 0, U ]
 				_mm_alignr_epi8(UV,UV,8)  // [0, U, 0, V ]
 			); // [ 0, V + U, 0, U + V ]
-			Dest[x] |= (
-				_mm_movemask_epi8(
-					UVTest
+			const std::uint16_t UVSumMask = _mm_movemask_epi8(
+				_mm_cmplt_epi32(
+					UVSum,
+					Area
 				)
-				&&
-				_mm_movemask_epi8(
-					_mm_cmplt_epi32(
-						UVSum,
-						Area
-					)
-				) == 0x0F0F
 			);
-			CurPoint = _mm_add_epi64(
+			Dest[x] |= (
+				(UVTestMask & UVSumMask) == 0x0F0F
+			);
+			CurPoint = _mm_add_epi32(
 				CurPoint,
-				_mm_set_epi64x(0,1)
+				_mm_set_epi32(0,1,0,1)
 			);
 		}
 		// CurPoint.x = XBounds.first;
 		CurPoint = _mm_blend_epi32(
 			CurPoint,
-			_mm_set1_epi64x(XBounds.first),
-			0b0011
+			_mm_set1_epi32(XBounds.first),
+			0b0101
 		);
-		CurPoint = _mm_add_epi64(
+		CurPoint = _mm_add_epi32(
 			CurPoint,
-			_mm_set_epi64x(1,0)
+			_mm_set_epi32(1, 0, 1, 0)
 		);
 	}
 }
