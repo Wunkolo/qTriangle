@@ -1,7 +1,7 @@
 #include <qTriangle/qTriangle.hpp>
 
-#include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/scalar_relational.hpp>
 
