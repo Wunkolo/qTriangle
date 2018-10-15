@@ -45,6 +45,11 @@ add_library(
 	source/qTriangle/qTriangle.cpp
 	source/qTriangle/Util.cpp
 )
+target_link_libraries(
+	qTriangle
+	PRIVATE
+	glm
+)
 
 ### Tests
 enable_testing()
@@ -58,6 +63,7 @@ target_link_libraries(
 	Display
 	PRIVATE
 	qTriangle
+	glm
 )
 add_test(
 	NAME Display
@@ -73,6 +79,7 @@ target_link_libraries(
 	Benchmark
 	PRIVATE
 	qTriangle
+	glm
 )
 add_test(
 	NAME Benchmark
@@ -88,6 +95,7 @@ target_link_libraries(
 	FillShape
 	PRIVATE
 	qTriangle
+	glm
 )
 add_test(
 	NAME FillShape
