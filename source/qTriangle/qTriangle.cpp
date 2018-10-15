@@ -596,40 +596,44 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			//        V       V       V       V
 			// U = (Dot11 * Dot02 - Dot01 * Dot12);
 			// V = (Dot00 * Dot12 - Dot01 * Dot02);
-			const __m128i UV = _mm_sub_epi32(
-				_mm_mullo_epi32(
+			// [ V_64, U_64 ]
+			const __m128i UV = _mm_sub_epi64(
+				_mm_mul_epi32(
 					CrossVec1,
 					DotVec
 				),
-				_mm_mullo_epi32(
+				_mm_mul_epi32(
 					CrossVec2,
 					_mm_alignr_epi8(DotVec,DotVec,8)
 				)
 			);
+
+			// Test that each component is greater than or equal to 0
 			// ( X >= 0 ) ⇒ ¬( X < 0 )
-			const __m128i UVTest = _mm_cmplt_epi32(
-				UV,
-				_mm_setzero_si128()
+			const __m128i UVTest = _mm_andnot_si128(
+				_mm_cmpgt_epi64(
+					_mm_setzero_si128(),
+					UV
+				),
+				_mm_set1_epi16(-1)
 			);
-			const std::uint16_t UVTestMask = 0x0F0F & ~_mm_movemask_epi8(
-				UVTest
-			);
-			const __m128i UVSum = _mm_add_epi32(
-				UV, // [0, V, 0, U ]
-				_mm_alignr_epi8(UV,UV,8)  // [0, U, 0, V ]
-			); // [ 0, V + U, 0, U + V ]
-			const std::uint16_t UVSumMask = _mm_movemask_epi8(
-				_mm_cmplt_epi32(
-					UVSum,
-					Area
-				)
-			);
+			const std::uint16_t UVTestMask = _mm_movemask_epi8(UVTest);
+
+			// Test that U + V < Area
+			const __m128i UVSumTest = _mm_cmpgt_epi64(
+				Area,
+				_mm_add_epi64(
+					UV,							// [     V,     U ]
+					_mm_alignr_epi8(UV,UV,8)	// [     U,     V ]
+				)								// [ V + U, U + V ]
+			)
+			const std::uint16_t UVSumMask = _mm_movemask_epi8(UVSumTest);
 			Dest[x] |= (
-				(UVTestMask & UVSumMask) == 0x0F0F
+				(UVTestMask & UVSumMask) == 0xFFFF
 			);
 			CurPoint = _mm_add_epi32(
 				CurPoint,
-				_mm_set_epi32(0,1,0,1)
+				_mm_set_epi32(0, 1, 0, 1)
 			);
 		}
 		// CurPoint.x = XBounds.first;
@@ -663,7 +667,7 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 		vld1_s32(reinterpret_cast<const std::int32_t*>(&Tri.Vert[2]))
 	};
 	const int32x2_t V0 = vsub_s32(CurTri.val[2], CurTri.val[0]);
-	const int32x2_t V1 = vsub_s32(CurTri.val[1], CurTri.val[0]);
+	const int33x2_t V1 = vsub_s32(CurTri.val[1], CurTri.val[0]);
 
 	const std::int32_t Dot00 = NEONDot(V0,V0);
 	const std::int32_t Dot01 = NEONDot(V0,V1);
