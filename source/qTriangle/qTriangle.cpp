@@ -602,7 +602,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		for( std::size_t i = 0 ; i < (Width - x) / 2; ++i, x += 2)
 		{
 			// [next point, cur point]
-			const __m256i V2 = _mm256_sub_epi64(
+			const __m256i V2 = _mm256_sub_epi32(
 				_mm256_set_m128i(
 					// Second point ( next point over )
 					_mm_add_epi32(
@@ -671,7 +671,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			const std::uint32_t UVAreaTestMask = _mm256_movemask_epi8(UVAreaTest);
 
 			const std::uint32_t Intersection2 = UVTestMask & UVAreaTestMask;
-			// Dest[x + 0] |= ( (   Intersection2        & 0xFFFF) == 0xFFFF );
+
+			Dest[x + 0] |= ( (   Intersection2        & 0xFFFF) == 0xFFFF );
 			Dest[x + 1] |= ( ( ( Intersection2 >> 16) & 0xFFFF) == 0xFFFF );
 
 			CurPoint = _mm_add_epi32(
@@ -685,9 +686,6 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		{
 			const __m128i V2 = _mm_sub_epi32(CurPoint,CurTri[0]);
 
-			// TODO: Find a way to have the dot-product already result in
-			// a 64x2 vector
-			// trying to reach:
 			// [ 0, Dot02, 0, Dot02 ]
 			const __m128i Dot02 = _mm_dot2_epi32(V0, V2);
 			// [ 0, Dot12, 0, Dot12 ]
