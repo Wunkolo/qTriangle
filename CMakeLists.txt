@@ -1,5 +1,5 @@
 cmake_minimum_required( VERSION 3.2.2 )
-project( qTriangle )
+project( qTriangle CXX )
 
 ### Standard
 set( CMAKE_CXX_STANDARD 17 )
@@ -23,7 +23,7 @@ if( MSVC )
 	add_compile_options( /arch:AVX2 )
 	add_compile_options( /W3 )
 	add_compile_options( /Gv )
-elseif( CMAKE_COMPILER_IS_GNUCXX )
+elseif( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 	add_compile_options( -march=native )
 	add_compile_options( -Ofast )
 	add_compile_options( -Wall )
