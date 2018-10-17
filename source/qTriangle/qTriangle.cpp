@@ -142,7 +142,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				// Shuffles the two 128-bit lanes
 				_mm512_shuffle_epi32(
 					PointDir,
-					_MM_SHUFFLE(2, 3, 0, 1)
+					static_cast<_MM_PERM_ENUM>(_MM_SHUFFLE(3, 3, 0, 1))
 				)
 			);
 
