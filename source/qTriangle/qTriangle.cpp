@@ -125,7 +125,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 						0, 1, 0, 1, // NextPoint
 						0, 0, 0, 0, // 
 						0, 0, 0, 0  // Current Point
-					),
+					)
 				),
 				_mm512_broadcast_i32x8(TriVerts120)
 			);
