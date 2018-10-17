@@ -16,23 +16,53 @@ namespace fs = std::experimental::filesystem;
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-constexpr std::size_t Width = 200;
-constexpr std::size_t Height = 250;
+constexpr std::size_t Width = 300;
+constexpr std::size_t Height = 300;
 
 int main()
 {
-	// Simple Square
+	// "a"
 	const qTri::Vec2 Edges[] = {
-		qTri::Vec2{120, 110},
-		qTri::Vec2{130, 140},
-		qTri::Vec2{160, 140},
-		qTri::Vec2{140, 160},
-		qTri::Vec2{150, 190},
-		qTri::Vec2{120, 170},
-		qTri::Vec2{ 90, 190},
-		qTri::Vec2{100, 160},
-		qTri::Vec2{ 80, 140},
-		qTri::Vec2{110, 140}
+		qTri::Vec2{235,152},
+		qTri::Vec2{176,165},
+		qTri::Vec2{144,173},
+		qTri::Vec2{129,184},
+		qTri::Vec2{124,202},
+		qTri::Vec2{135,226},
+		qTri::Vec2{168,235},
+		qTri::Vec2{206,226},
+		qTri::Vec2{230,201},
+		qTri::Vec2{236,165},
+		qTri::Vec2{235,152},
+
+		qTri::Vec2{238,233},
+		qTri::Vec2{200,257},
+		qTri::Vec2{159,264},
+		qTri::Vec2{105,247},
+		qTri::Vec2{86,203},
+		qTri::Vec2{93,174},
+		qTri::Vec2{112,153},
+		qTri::Vec2{138,141},
+		qTri::Vec2{171,136},
+		qTri::Vec2{236,123},
+		qTri::Vec2{236,114},
+		qTri::Vec2{226,82},
+		qTri::Vec2{184,70},
+		qTri::Vec2{146,79},
+		qTri::Vec2{128,111},
+		qTri::Vec2{92,106},
+		qTri::Vec2{108,69},
+		qTri::Vec2{140,48},
+		qTri::Vec2{189,40},
+		qTri::Vec2{234,47},
+		qTri::Vec2{259,63},
+		qTri::Vec2{270,87},
+		qTri::Vec2{272,121},
+		qTri::Vec2{272,169},
+		qTri::Vec2{274,233},
+		qTri::Vec2{283,259},
+		qTri::Vec2{246,259},
+		qTri::Vec2{238,233},
 	};
 
 	qTri::Triangle Triangles[std::extent<decltype(Edges)>::value];
