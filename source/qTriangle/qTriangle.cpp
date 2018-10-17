@@ -210,14 +210,12 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 			// Check if `X >= 0` for each of the 3 Z-components 
 			// ( x >= 0 ) ⇒ ¬( X < 0 )
-			Dest[x] |= _mm256_testz_si256(
-				// Check only the cross-area elements
-				_mm256_set_epi32(0, 0, 0, -1, 0, -1, 0, -1),
+			Dest[x] |= (_mm256_movemask_epi8(
 				_mm256_cmpgt_epi32(
-					_mm256_setzero_si256(),
-					CrossAreas
+					CrossAreas,
+					_mm256_setzero_si256()
 				)
-			);
+			) & 0x000F0F0F) == 0x000F0F0F;
 			// Increment to next column
 			CurPoint = _mm256_add_epi32(
 				CurPoint,
