@@ -95,6 +95,22 @@ int main()
 				Frame.Pixels.data(),
 				0
 			);
+			
+			// Write an image of the current triangle
+			// Post-process from [0x00,0x01] to [0x00,0xFF]
+			// Compiler vectorization loves loops like this
+			for( std::size_t i = 0; i < Width * Height; ++i )
+			{
+				CurInversion.Pixels[i] *= 0xFF;
+			}
+			stbi_write_png(
+				(FrameFolder / ("Tri" + std::to_string(FrameIdx) + ".png")).c_str(),
+				Width,
+				Height,
+				1,
+				CurInversion.Pixels.data(),
+				0
+			);
 			// ffmpeg -f image2 -framerate 2 -i %d.png -vf "scale=iw*2:ih*2" -sws_flags neighbor Anim.gif
 			++FrameIdx;
 		}
