@@ -38,7 +38,7 @@ static const bool _WndV100Enabled = []() -> bool
 
 constexpr std::size_t Width = 80;
 constexpr std::size_t Height = 50;
-
+constexpr std::size_t Loops = 5;
 static qTri::Triangle Triangles[100'000];
 
 int main()
@@ -75,9 +75,10 @@ int main()
 		);
 	}
 	std::printf(
-		"%zu Triangles\n"
+		"%zu Triangles x %zu times\n"
 		"%zu x %zu Image map\n",
 		std::extent<decltype(Triangles)>::value,
+		Loops,
 		Width,
 		Height
 	);
@@ -93,15 +94,18 @@ int main()
 		);
 		qTri::Image CurFrame(Width, Height);
 		std::size_t ExecTime = 0;
-		for( const qTri::Triangle& CurTriangle : Triangles )
+		for( std::size_t i = 0; i < Loops; ++i)
 		{
-			ExecTime += Bench<>::Duration(
-				FillAlgorithm.first,
-				CurFrame,
-				CurTriangle
-			).count();
+			for( const qTri::Triangle& CurTriangle : Triangles )
+			{
+				ExecTime += Bench<>::Duration(
+					FillAlgorithm.first,
+					CurFrame,
+					CurTriangle
+				).count();
+			}
 		}
-		ExecTime /= std::extent<decltype(Triangles)>::value;
+		ExecTime /= std::extent<decltype(Triangles)>::value * Loops;
 		std::printf(
 			"| %zu ns\n",
 			ExecTime
