@@ -118,7 +118,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 		for( std::size_t i = 0; i < (Width - x) / 2; ++i, x += 2 )
 		{
 			const __m512i PointDir = _mm512_sub_epi32(
-				_mm512_add_epi64(
+				_mm512_add_epi32(
 					_mm512_broadcast_i32x8(CurPoint),
 					_mm512_set_epi32(
 						0, 1, 0, 1, // 
@@ -142,7 +142,7 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 				// Shuffles the two 128-bit lanes
 				_mm512_shuffle_epi32(
 					PointDir,
-					static_cast<_MM_PERM_ENUM>(_MM_SHUFFLE(3, 3, 0, 1))
+					static_cast<_MM_PERM_ENUM>(_MM_SHUFFLE(2, 3, 0, 1))
 				)
 			);
 
@@ -158,12 +158,14 @@ void CrossFillAVX2(Image& Frame, const Triangle& Tri)
 			);
 			// Check if `X >= 0` for each of the 3 Z-components 
 			// ( x >= 0 ) ⇒ ¬( X < 0 )
-			const auto Test = _mm512_cmpge_epi32_mask(
-				CrossAreas,
-				_mm512_setzero_si512()
+			const __mmask16 Test = _mm512_knot(
+				_mm512_cmpge_epi32_mask(
+					CrossAreas,
+					_mm512_setzero_si512()
+				)
 			);
-			Dest[x+0] |= ( Test & 0b00010101 << 0 ) == 0b00010101 << 0;
-			Dest[x+1] |= ( Test & 0b00010101 << 8 ) == 0b00010101 << 8;
+			Dest[x+0] |= ( Test & (0b00010101 << 0) ) == (0b00010101 << 0);
+			Dest[x+1] |= ( Test & (0b00010101 << 8) ) == (0b00010101 << 8);
 			// Increment to next column
 			CurPoint = _mm256_add_epi32(
 				CurPoint,
