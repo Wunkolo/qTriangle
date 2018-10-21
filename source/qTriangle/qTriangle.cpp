@@ -464,7 +464,6 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 		(U + V < Area);
 }
 
-//  Only V2,Dot02,Dot12,U, and V have to be re-generated for each vertex
 void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
 	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
@@ -481,18 +480,23 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 	Vec2 CurPoint;
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
+		const Vec2 V2 = CurPoint - Tri.Vert[0];
+		const std::int32_t Dot02 = glm::compAdd(V0 * V2);
+		const std::int32_t Dot12 = glm::compAdd(V1 * V2);
+		std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
+		std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+		// Derivatives of U and V based on the derivative of CurPoint being (1,0)
+		const std::int32_t dU = V0.x * Dot11 - V1.x * Dot01;
+		const std::int32_t dV = V1.x * Dot00 - V0.x * Dot01;
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			const Vec2 V2 = CurPoint - Tri.Vert[0];
-			const std::int32_t Dot02 = glm::compAdd(V0 * V2);
-			const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-			const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
-			const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
 			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= (
 				(U >= 0) &&
 				(V >= 0) &&
 				(U + V < Area)
 			);
+			U += dU;
+			V += dV;
 		}
 	}
 }
