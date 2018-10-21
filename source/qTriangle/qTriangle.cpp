@@ -477,27 +477,35 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	Vec2 CurPoint;
+	Vec2 CurPoint{XBounds.first,YBounds.first};
+	const Vec2 V2 = CurPoint - Tri.Vert[0];
+	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
+	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
+	std::int32_t U_0 = (Dot11 * Dot02 - Dot01 * Dot12);
+	std::int32_t V_0 = (Dot00 * Dot12 - Dot01 * Dot02);
+	// Derivatives of U and V based on the derivative of CurPoint being (0,1)
+	const std::int32_t dU_y = V0.y * Dot11 - V1.y * Dot01;
+	const std::int32_t dV_y = V1.y * Dot00 - V0.y * Dot01;
+	// Derivatives of U and V based on the derivative of CurPoint being (1,0)
+	const std::int32_t dU_x = V0.x * Dot11 - V1.x * Dot01;
+	const std::int32_t dV_x = V1.x * Dot00 - V0.x * Dot01;
+	// Precompute starting point and derivatives for U and V
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
-		const Vec2 V2 = CurPoint - Tri.Vert[0];
-		const std::int32_t Dot02 = glm::compAdd(V0 * V2);
-		const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-		std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
-		std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
-		// Derivatives of U and V based on the derivative of CurPoint being (1,0)
-		const std::int32_t dU = V0.x * Dot11 - V1.x * Dot01;
-		const std::int32_t dV = V1.x * Dot00 - V0.x * Dot01;
+		std::int32_t CurU = U_0;
+		std::int32_t CurV = V_0;
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
 			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= (
-				(U >= 0) &&
-				(V >= 0) &&
-				(U + V < Area)
+				(CurU >= 0) &&
+				(CurV >= 0) &&
+				(CurU + CurV < Area)
 			);
-			U += dU;
-			V += dV;
+			CurU += dU_x;
+			CurV += dV_x;
 		}
+		U_0 += dU_y;
+		V_0 += dV_y;
 	}
 }
 
