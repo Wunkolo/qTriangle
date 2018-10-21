@@ -477,10 +477,13 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	// Pre-compute starting point, and derivatives for loop
-	Vec2 CurPoint{XBounds.first,YBounds.first};
-	const Vec2 V2 = CurPoint - Tri.Vert[0];
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	const Vec2 StartPoint{XBounds.first,YBounds.first};
+	const Vec2 V2 = StartPoint - Tri.Vert[0];
 	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
 	Vec2 UVStart{
@@ -491,19 +494,25 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 	const Vec2 dU = V0 * Dot11 - V1 * Dot01;
 	const Vec2 dV = V1 * Dot00 - V0 * Dot01;
 
-	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
+		// Rasterize Scanline
 		Vec2 CurUV = UVStart;
-		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
+		for(std::size_t x = 0 ; x < Width; ++x )
 		{
-			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= (
+			// Test
+			Dest[x] |= (
 				(CurUV.x >= 0) &&
 				(CurUV.y >= 0) &&
 				(CurUV.x + CurUV.y < Area)
 			);
+
+			// Integrate
 			CurUV.x += dU.x;
 			CurUV.y += dV.x;
 		}
+
+		// Integrate
 		UVStart.x += dU.y;
 		UVStart.y += dV.y;
 	}
@@ -511,259 +520,58 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 #ifdef __AVX2__
 
-// SSE4.1
-// Computes two R^2 dot products at once
-// [Ay2,Ax2,Ay1,Ax1] dot [By2,Bx2,By1,Bx1] = [0,dot2,0,dot1]
-inline __m128i _mm_dot2_epi32(const __m128i A, const __m128i B)
-{
-	//   [Ay2,Ax2,Ay1,Ax1]
-	// * [By2,Bx2,By1,Bx1]
-	//   [Ay2 * By2, Ax2 * Bx2, Ay1 * By1, Ax1 * Bx1]
-	const __m128i Product = _mm_mullo_epi32(
-		A,
-		B
-	);
-	//   [ 0, Ax2 * Bx2, 0, Ax1 * Bx1]
-	// + [ 0, Ay2 * By2, 0, Ay1 * By1]
-	//   [ 0, Ay2 * By2 + Ax2 * Bx2, 0, Ay1 * By1 + Ax1 * Bx1 ]
-	return _mm_add_epi32(
-		_mm_and_si128(Product,_mm_set1_epi64x(0xFFFFFFFF)), // X columns
-		_mm_srli_epi64(Product,32) // Y columns
-	);
-}
-
-// AVX2
-// Computes four R^2 dot products at once
-inline __m256i _mm256_dot2_epi32(const __m256i A, const __m256i B)
-{
-	//   [Ay2,Ax2,Ay1,Ax1]
-	// * [By2,Bx2,By1,Bx1]
-	//   [Ay2 * By2, Ax2 * Bx2, Ay1 * By1, Ax1 * Bx1]
-	const __m256i Product = _mm256_mullo_epi32(
-		A,
-		B
-	);
-	//   [ 0, Ax2 * Bx2, 0, Ax1 * Bx1]
-	// + [ 0, Ay2 * By2, 0, Ay1 * By1]
-	//   [ 0, Ay2 * By2 + Ax2 * Bx2, 0, Ay1 * By1 + Ax1 * Bx1 ]
-	return _mm256_add_epi32(
-		_mm256_and_si256(Product,_mm256_set1_epi64x(0xFFFFFFFF)), // X columns
-		_mm256_srli_epi64(Product,32) // Y columns
-	);
-}
 
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
-	// 128-bit vectors composing of four 32-bit values
-	const __m128i CurTri[3] = {
-		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[0].y ) << 32 ) | Tri.Vert[0].x ),
-		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[1].y ) << 32 ) | Tri.Vert[1].x ),
-		_mm_set1_epi64x( ( static_cast<std::uint64_t>( Tri.Vert[2].y ) << 32 ) | Tri.Vert[2].x )
-	};
+	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
+	const Vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
 
-	// U and V vectors
-	const __m128i V0 = _mm_sub_epi32(CurTri[2], CurTri[0]);
-	const __m128i V1 = _mm_sub_epi32(CurTri[1], CurTri[0]);
+	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
+	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
+	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
 
-	// [0,dot00,0,dot00]
-	const __m128i Dot00 = _mm_dot2_epi32(V0, V0);
-	// [0,dot01,0,dot01]
-	const __m128i Dot01 = _mm_dot2_epi32(V0, V1);
-	// [0,dot11,0,dot11]
-	const __m128i Dot11 = _mm_dot2_epi32(V1, V1);
-
-	// [area64,area64]
-	const __m128i Area = _mm_sub_epi32(
-		_mm_mul_epi32(Dot00,Dot11),
-		_mm_mul_epi32(Dot01,Dot01)
-	);
-	// const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
-
-	// [ 0, Dot00, 0, Dot11]
-	const __m128i CrossVec1 = _mm_blend_epi32( // AVX2
-		Dot00, Dot11,
-		0b00'01
-	);
-	// [ Dot01, Dot01, Dot01, Dot01]
-	const __m128i CrossVec2 = _mm_broadcastd_epi32(
-		Dot01
-	);
+	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
 	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
+	// Pre-compute starting point, and derivatives for loop
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	__m128i CurPoint = _mm_set_epi32(
-		YBounds.first, XBounds.first,
-		YBounds.first, XBounds.first
-	);
+	const Vec2 StartPoint{XBounds.first,YBounds.first};
+	const Vec2 V2 = StartPoint - Tri.Vert[0];
+	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
+	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
+	Vec2 UVStart{
+		Dot11 * Dot02 - Dot01 * Dot12,
+		Dot00 * Dot12 - Dot01 * Dot02
+	};
+	// Partial derivatives of U and V in terms of CurPoint
+	const Vec2 dU = V0 * Dot11 - V1 * Dot01;
+	const Vec2 dV = V1 * Dot00 - V0 * Dot01;
 
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Rasterize Scanline
-		std::size_t x = 0;
-
-		// Two at a time
-		const __m256i V0_256 = _mm256_broadcastsi128_si256(V0);
-		const __m256i V1_256 = _mm256_broadcastsi128_si256(V1);
-		const __m256i CrossVec1_256 = _mm256_broadcastsi128_si256(CrossVec1);
-		const __m256i CrossVec2_256 = _mm256_broadcastsi128_si256(CrossVec2);
-		const __m256i Area_256 = _mm256_broadcastsi128_si256(Area);
-		for( std::size_t i = 0 ; i < (Width - x) / 2; ++i, x += 2)
+		Vec2 CurUV = UVStart;
+		for(std::size_t x = 0 ; x < Width; ++x )
 		{
-			// [next point, cur point]
-			const __m256i V2 = _mm256_sub_epi32(
-				_mm256_set_m128i(
-					// Second point ( next point over )
-					_mm_add_epi32(
-						CurPoint,
-						_mm_set_epi32(0,1,0,1)
-					),
-					// First point
-					CurPoint
-				),
-				_mm256_broadcastsi128_si256(CurTri[0])
-			);
-
-			// [0, dot02, 0, dot02, 0, dot02, 0, dot02 ]
-			const __m256i Dot02 = _mm256_dot2_epi32(
-				V0_256,
-				V2
-			);
-
-			// [0, dot12, 0, dot12, 0, dot12, 0, dot12 ]
-			const __m256i Dot12 = _mm256_dot2_epi32(
-				V1_256,
-				V2
-			);
-
-			// [ 0, Dot12, 0, Dot02, 0, Dot12, 0, Dot02 ]
-			const __m256i DotVec = _mm256_blend_epi32(
-				Dot02, Dot12,
-				0b01'00'01'00
-			);	
-
-			//     CrossVec1       CrossVec2
-			//        |     DotVec    |     DotVec(Reversed)
-			//        |       |       |       |
-			//        V       V       V       V
-			// U = (Dot11 * Dot02 - Dot01 * Dot12);
-			// V = (Dot00 * Dot12 - Dot01 * Dot02);
-			// [ V_64, U_64, V_64, U_64 ]
-			const __m256i UV = _mm256_sub_epi64(
-				_mm256_mul_epi32(
-					CrossVec1_256,
-					DotVec
-				),
-				_mm256_mul_epi32(
-					CrossVec2_256,
-					_mm256_alignr_epi8(DotVec,DotVec,8)
-				)
-			);
-			// Test that each component is greater than or equal to 0
-			// ( X >= 0 ) ⇒ ¬( X < 0 )
-			const __m256i UVTest = _mm256_andnot_si256(
-				_mm256_cmpgt_epi64(
-					_mm256_setzero_si256(),
-					UV
-				),
-				_mm256_set1_epi16(-1)
-			);
-			const std::uint32_t UVTestMask = _mm256_movemask_epi8(UVTest);
-
-			const __m256i UVAreaTest = _mm256_cmpgt_epi64(
-				Area_256,
-				_mm256_add_epi64(
-					UV,							// [     V,     U ]
-					_mm256_alignr_epi8(UV,UV,8)	// [     U,     V ]
-				)								// [ V + U, U + V ]
-			);
-			const std::uint32_t UVAreaTestMask = _mm256_movemask_epi8(UVAreaTest);
-
-			const std::uint32_t Intersection2 = UVTestMask & UVAreaTestMask;
-
-			Dest[x + 0] |= ( (   Intersection2        & 0xFFFF) == 0xFFFF );
-			Dest[x + 1] |= ( ( ( Intersection2 >> 16) & 0xFFFF) == 0xFFFF );
-
-			CurPoint = _mm_add_epi32(
-				CurPoint,
-				_mm_set_epi32(0, 2, 0, 2)
-			);
-		}
-
-		// Serial
-		for( ; x < Width; ++x )
-		{
-			const __m128i V2 = _mm_sub_epi32(CurPoint,CurTri[0]);
-
-			// [ 0, Dot02, 0, Dot02 ]
-			const __m128i Dot02 = _mm_dot2_epi32(V0, V2);
-			// [ 0, Dot12, 0, Dot12 ]
-			const __m128i Dot12 = _mm_dot2_epi32(V1, V2);
-			// [ 0, Dot12, 0, Dot02 ]
-			const __m128i DotVec = _mm_blend_epi32(
-				Dot02, Dot12,
-				0b01'00
-			);
-
-			//     CrossVec1       CrossVec2
-			//        |     DotVec    |     DotVec(Reversed)
-			//        |       |       |       |
-			//        V       V       V       V
-			// U = (Dot11 * Dot02 - Dot01 * Dot12);
-			// V = (Dot00 * Dot12 - Dot01 * Dot02);
-			// [ V_64, U_64 ]
-			const __m128i UV = _mm_sub_epi64(
-				_mm_mul_epi32(
-					CrossVec1,
-					DotVec
-				),
-				_mm_mul_epi32(
-					CrossVec2,
-					_mm_alignr_epi8(DotVec,DotVec,8)
-				)
-			);
-
-			// Test that each component is greater than or equal to 0
-			// ( X >= 0 ) ⇒ ¬( X < 0 )
-			const __m128i UVTest = _mm_andnot_si128(
-				_mm_cmpgt_epi64(
-					_mm_setzero_si128(),
-					UV
-				),
-				_mm_set1_epi16(-1)
-			);
-			const std::uint16_t UVTestMask = _mm_movemask_epi8(UVTest);
-
-			// Test that U + V < Area
-			const __m128i UVAreaTest = _mm_cmpgt_epi64(
-				Area,
-				_mm_add_epi64(
-					UV,							// [     V,     U ]
-					_mm_alignr_epi8(UV,UV,8)	// [     U,     V ]
-				)								// [ V + U, U + V ]
-			);
-			const std::uint16_t UVAreaTestMask = _mm_movemask_epi8(UVAreaTest);
+			// Test
 			Dest[x] |= (
-				(UVTestMask & UVAreaTestMask) == 0xFFFF
+				(CurUV.x >= 0) &&
+				(CurUV.y >= 0) &&
+				(CurUV.x + CurUV.y < Area)
 			);
-			CurPoint = _mm_add_epi32(
-				CurPoint,
-				_mm_set_epi32(0, 1, 0, 1)
-			);
+
+			// Integrate
+			CurUV.x += dU.x;
+			CurUV.y += dV.x;
 		}
-		// CurPoint.x = XBounds.first;
-		CurPoint = _mm_blend_epi32(
-			CurPoint,
-			_mm_set1_epi32(XBounds.first),
-			0b0101
-		);
-		CurPoint = _mm_add_epi32(
-			CurPoint,
-			_mm_set_epi32(1, 0, 1, 0)
-		);
+
+		// Integrate
+		UVStart.x += dU.y;
+		UVStart.y += dV.y;
 	}
 }
 #endif
@@ -791,10 +599,6 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 	const std::int32_t Dot01 = NEONDot(V0,V1);
 	const std::int32_t Dot11 = NEONDot(V1,V1);
 
-	const int32x2_t CrossVec1 = int32x2_t{Dot11,Dot00};
-	const int32x2_t CrossVec2 = vdup_n_s32(Dot01);
-
-	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
