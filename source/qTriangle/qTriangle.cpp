@@ -477,35 +477,35 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+
+	// Pre-compute starting point, and derivatives for loop
 	Vec2 CurPoint{XBounds.first,YBounds.first};
 	const Vec2 V2 = CurPoint - Tri.Vert[0];
 	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-	std::int32_t U_0 = (Dot11 * Dot02 - Dot01 * Dot12);
-	std::int32_t V_0 = (Dot00 * Dot12 - Dot01 * Dot02);
-	// Derivatives of U and V based on the derivative of CurPoint being (0,1)
-	const std::int32_t dU_y = V0.y * Dot11 - V1.y * Dot01;
-	const std::int32_t dV_y = V1.y * Dot00 - V0.y * Dot01;
-	// Derivatives of U and V based on the derivative of CurPoint being (1,0)
-	const std::int32_t dU_x = V0.x * Dot11 - V1.x * Dot01;
-	const std::int32_t dV_x = V1.x * Dot00 - V0.x * Dot01;
-	// Precompute starting point and derivatives for U and V
+	Vec2 UVStart{
+		Dot11 * Dot02 - Dot01 * Dot12,
+		Dot00 * Dot12 - Dot01 * Dot02
+	};
+	// Partial derivatives of U and V in terms of CurPoint
+	const Vec2 dU = V0 * Dot11 - V1 * Dot01;
+	const Vec2 dV = V1 * Dot00 - V0 * Dot01;
+
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
-		std::int32_t CurU = U_0;
-		std::int32_t CurV = V_0;
+		Vec2 CurUV = UVStart;
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
 			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= (
-				(CurU >= 0) &&
-				(CurV >= 0) &&
-				(CurU + CurV < Area)
+				(CurUV.x >= 0) &&
+				(CurUV.y >= 0) &&
+				(CurUV.x + CurUV.y < Area)
 			);
-			CurU += dU_x;
-			CurV += dV_x;
+			CurUV.x += dU.x;
+			CurUV.y += dV.x;
 		}
-		U_0 += dU_y;
-		V_0 += dV_y;
+		UVStart.x += dU.y;
+		UVStart.y += dV.y;
 	}
 }
 
