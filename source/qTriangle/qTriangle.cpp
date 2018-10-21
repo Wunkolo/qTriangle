@@ -560,13 +560,18 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		// Two samples at a time
 		// SSE2
 		__m128i CurUV_2 = _mm_set_epi32(
-			UVStart.y + dV.y, UVStart.x + dU.x, UVStart.y, UVStart.x
+			// Next UV over
+			CurUV.y + dV.x, CurUV.x + dU.x,
+			// Current UV
+			CurUV.y, CurUV.x
 		);
-		const __m128i dUV_2 = _mm_slli_epi32(
-			_mm_set_epi32(dV.y, dU.x, dV.y, dU.x),
-			1 // * 2
+		const __m128i dUV_2 = _mm_set_epi32(
+			dV.x * 2,
+			dU.x * 2,
+			dV.x * 2,
+			dU.x * 2
 		);
-		for( std::size_t i = 0; i < (Width - x) / 2; ++i, x += 2 )
+		for( ; (Width - x) / 2; x += 2 )
 		{
 			// Test
 			// U >= 0
@@ -583,16 +588,17 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				_mm_cmplt_epi32(
 					_mm_add_epi32(
 						CurUV_2,
-						_mm_shuffle_epi32( CurUV_2, _MM_SHUFFLE( 2, 3, 0, 1 ) )
+						_mm_shuffle_epi32( CurUV_2, 0b10'11'00'01 )
 					),
 					_mm_set1_epi32(Area)
 				)
 			);
 			const std::uint16_t Tests = PositiveTest & AreaTest;
-			Dest[x+0] |= ( (Tests & 0x00FF) == 0x00FF );
-			Dest[x+1] |= ( (Tests & 0xFF00) == 0xFF00 );
+			Dest[x+0] |= ( (Tests & 0x00'FF) == 0x00'FF );
+			Dest[x+1] |= ( (Tests & 0xFF'00) == 0xFF'00 );
 			// Integrate
 			CurUV_2 = _mm_add_epi32( CurUV_2, dUV_2 );
+
 			CurUV.x += dU.x * 2;
 			CurUV.y += dV.x * 2;
 		}
