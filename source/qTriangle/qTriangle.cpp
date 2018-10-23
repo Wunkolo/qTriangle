@@ -585,23 +585,24 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U >= 0
 			// V >= 0
 			// ( 0 <= X ) ⇒ ¬( 0 > X )
-			const std::uint32_t PositiveTest = ~_mm256_movemask_epi8(
-				_mm256_cmpgt_epi32(
-					_mm256_setzero_si256(),
-					CurUV_4
-				)
+			const __m256i PositiveTest = _mm256_cmpgt_epi32(
+				_mm256_setzero_si256(),
+				CurUV_4
 			);
 			// Area > U + V
-			const std::uint32_t AreaTest = _mm256_movemask_epi8(
-				_mm256_cmpgt_epi32(
-					_mm256_set1_epi32(Area),
-					_mm256_add_epi32(
-						CurUV_4,
-						_mm256_shuffle_epi32(CurUV_4, 0b10'11'00'01)
-					)
+			const __m256i AreaTest = _mm256_cmpgt_epi32(
+				_mm256_set1_epi32(Area),
+				_mm256_add_epi32(
+					CurUV_4,
+					_mm256_shuffle_epi32(CurUV_4, 0b10'11'00'01)
 				)
 			);
-			const std::uint32_t Tests = PositiveTest & AreaTest;
+			const std::uint32_t Tests = _mm256_movemask_epi8(
+				_mm256_andnot_si256( // This does the (¬PositiveTest AND AreaTests)
+					PositiveTest,
+					AreaTest
+				)
+			);
 			Dest[x + 0] |= ((Tests & 0x00'00'00'FF) == 0x00'00'00'FF);
 			Dest[x + 1] |= ((Tests & 0x00'00'FF'00) == 0x00'00'FF'00);
 			Dest[x + 2] |= ((Tests & 0x00'FF'00'00) == 0x00'FF'00'00);
@@ -633,23 +634,25 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U >= 0
 			// V >= 0
 			// ( X >= 0 ) ⇒ ¬( X < 0 )
-			const std::uint16_t PositiveTest = ~_mm_movemask_epi8(
-				_mm_cmplt_epi32(
-					CurUV_2,
-					_mm_setzero_si128()
-				)
+			const __m128i  PositiveTest = _mm_cmplt_epi32(
+				CurUV_2,
+				_mm_setzero_si128()
+
 			);
 			// U + V < Area
-			const std::uint16_t AreaTest = _mm_movemask_epi8(
-				_mm_cmplt_epi32(
-					_mm_add_epi32(
-						CurUV_2,
-						_mm_shuffle_epi32( CurUV_2, 0b10'11'00'01 )
-					),
-					_mm_set1_epi32(Area)
+			const __m128i AreaTest = _mm_cmplt_epi32(
+				_mm_add_epi32(
+					CurUV_2,
+					_mm_shuffle_epi32( CurUV_2, 0b10'11'00'01 )
+				),
+				_mm_set1_epi32(Area)
+			);
+			const std::uint16_t Tests = _mm_movemask_epi8(
+				_mm_andnot_si128( // This does the (¬PositiveTest AND AreaTests)
+					PositiveTest,
+					AreaTest
 				)
 			);
-			const std::uint16_t Tests = PositiveTest & AreaTest;
 			Dest[x+0] |= ( (Tests & 0x00'FF) == 0x00'FF );
 			Dest[x+1] |= ( (Tests & 0xFF'00) == 0xFF'00 );
 			// Integrate
@@ -785,10 +788,10 @@ void SerialBlit(Image& Frame, const Triangle& Tri)
 //// Exports
 
 const std::vector<
-	std::pair<
-		void(* const)(Image& Frame, const Triangle& Tri),
-		const char*
-	>
+std::pair<
+void(* const)(Image& Frame, const Triangle& Tri),
+const char*
+>
 > FillAlgorithms = {
 	// Cross-Product methods
 	{SerialBlit<CrossTest>,		"Serial-CrossProduct"},
