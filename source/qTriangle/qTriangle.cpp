@@ -603,10 +603,16 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					AreaTest
 				)
 			);
-			Dest[x + 0] |= ((Tests & 0x00'00'00'FF) == 0x00'00'00'FF);
-			Dest[x + 1] |= ((Tests & 0x00'00'FF'00) == 0x00'00'FF'00);
-			Dest[x + 2] |= ((Tests & 0x00'FF'00'00) == 0x00'FF'00'00);
-			Dest[x + 3] |= ((Tests & 0xFF'00'00'00) == 0xFF'00'00'00);
+			// Dest[x + 0] |= ((Tests & 0x00'00'00'FF) == 0x00'00'00'FF);
+			// Dest[x + 1] |= ((Tests & 0x00'00'FF'00) == 0x00'00'FF'00);
+			// Dest[x + 2] |= ((Tests & 0x00'FF'00'00) == 0x00'FF'00'00);
+			// Dest[x + 3] |= ((Tests & 0xFF'00'00'00) == 0xFF'00'00'00);
+			// SWAR method of checking each byte
+			// returning 0x01 where it is 0xFF and 0x00 otherwise by checking
+			// that adding 0x01 to the byte causes a carry into the last bit
+			const std::uint32_t CarrySlide = (Tests & 0x7F7F7F7F) + 0x01010101;
+			const std::uint32_t LastCarry  = (Tests ^ 0x01010101) & 0x80808080;
+			*reinterpret_cast<std::uint32_t*>(&Dest[x]) |= (CarrySlide & LastCarry) >> 7;
 			// Integrate
 			CurUV_4 = _mm256_add_epi32(CurUV_4, dUV_4);
 
@@ -653,8 +659,14 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 					AreaTest
 				)
 			);
-			Dest[x+0] |= ( (Tests & 0x00'FF) == 0x00'FF );
-			Dest[x+1] |= ( (Tests & 0xFF'00) == 0xFF'00 );
+			// Dest[x+0] |= ( (Tests & 0x00'FF) == 0x00'FF );
+			// Dest[x+1] |= ( (Tests & 0xFF'00) == 0xFF'00 );
+			// SWAR method of checking each byte
+			// returning 0x01 where it is 0xFF and 0x00 otherwise by checking
+			// that adding 0x01 to the byte causes a carry into the last bit
+			const std::uint16_t CarrySlide = (Tests & 0x7F7F) + 0x0101;
+			const std::uint16_t LastCarry  = (Tests ^ 0x0101) & 0x8080;
+			*reinterpret_cast<std::uint16_t*>(&Dest[x]) |= (CarrySlide & LastCarry) >> 7;
 			// Integrate
 			CurUV_2 = _mm_add_epi32( CurUV_2, dUV_2 );
 
