@@ -556,6 +556,73 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 		// Rasterize Scanline
 		Vec2 CurUV = UVStart;
 		std::size_t x = 0;
+		// Eight samples at a time
+		// AV512
+		#ifdef __AVX512F__
+		__m512i CurUV_8 = _mm512_set_epi32(
+			// Seventh UV over
+			CurUV.y + dV.x * 7, CurUV.x + dU.x * 7,
+			// Sixth UV over
+			CurUV.y + dV.x * 6, CurUV.x + dU.x * 6,
+			// Fifth UV over
+			CurUV.y + dV.x * 5, CurUV.x + dU.x * 5,
+			// Forth UV over
+			CurUV.y + dV.x * 4, CurUV.x + dU.x * 4,
+			// Forth UV over
+			CurUV.y + dV.x * 3, CurUV.x + dU.x * 3,
+			// Third UV over
+			CurUV.y + dV.x * 2, CurUV.x + dU.x * 2,
+			// Second UV over
+			CurUV.y + dV.x, CurUV.x + dU.x,
+			// Current UV
+			CurUV.y, CurUV.x
+		);
+		const __m512i dUV_8 = _mm512_set_epi32(
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8,
+			dV.x * 8, dU.x * 8
+		);
+		for( ; (Width - x) / 8; x += 8 )
+		{
+			// Test
+			// U >= 0
+			// V >= 0
+			// Checks the sign bit of each 32-bit U and V pair as 64-bit ints
+			// ( 0 <= X ) ⇒ ¬( 0 > X )
+			const __mmask8 NegativeTest = _mm512_test_epi64_mask(
+				CurUV_8,
+				_mm512_set1_epi32(0x80000000)
+			);
+			// Area > U + V
+			// Aligns the U and V and adds them into a 8 bit comparison
+			// compares to the "Area" term
+			const __mmask8 AreaTest = _mm256_cmpgt_epi32_mask(
+				_mm256_set1_epi32(Area),
+				_mm256_add_epi32(
+					_mm512_cvtepi64_epi32(CurUV_8),
+					_mm512_cvtepi64_epi32(
+						_mm512_srai_epi64(CurUV_8,32)
+					)
+				)
+			);
+			// This does (¬NegativeTest AND AreaTest)
+			const __mmask8 Tests = _kandn_mask8(NegativeTest, AreaTest);
+			*reinterpret_cast<std::uint64_t*>(&Dest[x]) |= _pdep_u64(
+				_cvtmask8_u32(Tests),
+				0x0101010101010101
+			);
+			// Integrate
+			CurUV_8 = _mm512_add_epi32(CurUV_8, dUV_8);
+
+			CurUV.x += dU.x * 8;
+			CurUV.y += dV.x * 8;
+		}
+		#endif
 
 		// Four samples at a time
 		// AVX2
@@ -570,14 +637,10 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			CurUV.y, CurUV.x
 		);
 		const __m256i dUV_4 = _mm256_set_epi32(
-			dV.x * 4,
-			dU.x * 4,
-			dV.x * 4,
-			dU.x * 4,
-			dV.x * 4,
-			dU.x * 4,
-			dV.x * 4,
-			dU.x * 4
+			dV.x * 4, dU.x * 4,
+			dV.x * 4, dU.x * 4,
+			dV.x * 4, dU.x * 4,
+			dV.x * 4, dU.x * 4
 		);
 		for( ; (Width - x) / 4; x += 4 )
 		{
@@ -585,7 +648,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U >= 0
 			// V >= 0
 			// ( 0 <= X ) ⇒ ¬( 0 > X )
-			const __m256i PositiveTest = _mm256_cmpgt_epi32(
+			const __m256i NegativeTest = _mm256_cmpgt_epi32(
 				_mm256_setzero_si256(),
 				CurUV_4
 			);
@@ -598,8 +661,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				)
 			);
 			const std::uint32_t Tests = _mm256_movemask_epi8(
-				_mm256_andnot_si256( // This does the (¬PositiveTest AND AreaTests)
-					PositiveTest,
+				_mm256_andnot_si256( // This does the (¬NegativeTest AND AreaTest)
+					NegativeTest,
 					AreaTest
 				)
 			);
@@ -629,10 +692,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			CurUV.y, CurUV.x
 		);
 		const __m128i dUV_2 = _mm_set_epi32(
-			dV.x * 2,
-			dU.x * 2,
-			dV.x * 2,
-			dU.x * 2
+			dV.x * 2, dU.x * 2,
+			dV.x * 2, dU.x * 2
 		);
 		for( ; (Width - x) / 2; x += 2 )
 		{
@@ -640,7 +701,7 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 			// U >= 0
 			// V >= 0
 			// ( X >= 0 ) ⇒ ¬( X < 0 )
-			const __m128i  PositiveTest = _mm_cmplt_epi32(
+			const __m128i NegativeTest = _mm_cmplt_epi32(
 				CurUV_2,
 				_mm_setzero_si128()
 
@@ -654,8 +715,8 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 				_mm_set1_epi32(Area)
 			);
 			const std::uint16_t Tests = _mm_movemask_epi8(
-				_mm_andnot_si128( // This does the (¬PositiveTest AND AreaTests)
-					PositiveTest,
+				_mm_andnot_si128( // This does the (¬NegativeTest AND AreaTests)
+					NegativeTest,
 					AreaTest
 				)
 			);
