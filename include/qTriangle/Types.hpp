@@ -22,10 +22,8 @@ public:
 	std::vector<std::uint8_t> Pixels;
 };
 
-using Vec2 = glm::i32vec2;
-
 struct alignas(16) Triangle
 {
-	Vec2 Vert[3];
+	glm::i32vec2 Vert[3];
 };
 }

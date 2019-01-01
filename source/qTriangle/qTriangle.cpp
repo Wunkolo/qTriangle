@@ -18,39 +18,46 @@ namespace qTri
 //// Cross Product Method
 
 // Get Cross-Product Z component from two directiona vectors
-inline std::int32_t CrossArea(const Vec2& DirA, const Vec2& DirB)
+// This is just a 2x2 determinant
+inline std::int32_t CrossArea(const glm::i32vec2& DirA, const glm::i32vec2& DirB)
 {
-		return DirA.x * DirB.y - DirA.y * DirB.x;
+	return DirA.x * DirB.y - DirA.y * DirB.x;
 }
 
 // Cross-product test against each edge, ensuring the area
 // of each parallelogram is positive
 // Requires that the triangle is in clockwise order
-bool CrossTest(const Vec2& Point, const Triangle& Tri)
+bool CrossTest(const glm::i32vec2& Point, const Triangle& Tri)
 {
-		return
-				CrossArea(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]) >= 0 &&
-				CrossArea(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]) >= 0 &&
-				CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]) >= 0;
+	return
+		glm::all(
+			glm::greaterThanEqual(
+				glm::i32vec3(
+					CrossArea(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]),
+					CrossArea(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]),
+					CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0])
+				),
+				glm::i32vec3(0)
+			)
+		);
 }
 
 void CrossFill(Image& Frame, const Triangle& Tri)
 {
-	const Vec2 EdgeDir[3] = {
+	const glm::i32vec2 EdgeDir[3] = {
 		Tri.Vert[1] - Tri.Vert[0],
 		Tri.Vert[2] - Tri.Vert[1],
 		Tri.Vert[0] - Tri.Vert[2]
 	};
 
-
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	Vec2 CurPoint;
+	glm::i32vec2 CurPoint;
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
 		{
-			const Vec2 PointDir[3] = {
+			const glm::i32vec2 PointDir[3] = {
 				CurPoint - Tri.Vert[0],
 				CurPoint - Tri.Vert[1],
 				CurPoint - Tri.Vert[2]
@@ -441,11 +448,11 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 
 //// Barycentric Method
 
-bool Barycentric(const Vec2& Point, const Triangle& Tri)
+bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 {
-	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
-	const Vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
-	const Vec2 V2 = Point - Tri.Vert[0];
+	const glm::i32vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
+	const glm::i32vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
+	const glm::i32vec2 V2 = Point - Tri.Vert[0];
 
 	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
 	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
@@ -453,9 +460,10 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
 
+	// These are just three determinants
 	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
-	const std::int32_t U = (Dot11 * Dot02 - Dot01 * Dot12);
-	const std::int32_t V = (Dot00 * Dot12 - Dot01 * Dot02);
+	const std::int32_t U    = (Dot11 * Dot02 - Dot01 * Dot12);
+	const std::int32_t V    = (Dot00 * Dot12 - Dot01 * Dot02);
 
 	// Convert to local plane's Barycentric coordiante system
 	return
@@ -466,12 +474,12 @@ bool Barycentric(const Vec2& Point, const Triangle& Tri)
 
 void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
-	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
-	const Vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
+	const glm::i32vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
+	const glm::i32vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
 
 	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
-	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
 	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
+	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
 
 	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
@@ -482,22 +490,22 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	// Pre-compute starting point, and derivatives for loop
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	const Vec2 StartPoint{XBounds.first,YBounds.first};
-	const Vec2 V2 = StartPoint - Tri.Vert[0];
+	const glm::i32vec2 StartPoint{XBounds.first,YBounds.first};
+	const glm::i32vec2 V2 = StartPoint - Tri.Vert[0];
 	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-	Vec2 UVStart{
+	glm::i32vec2 UVStart{
 		Dot11 * Dot02 - Dot01 * Dot12,
 		Dot00 * Dot12 - Dot01 * Dot02
 	};
 	// Partial derivatives of U and V in terms of CurPoint
-	const Vec2 dU = V0 * Dot11 - V1 * Dot01;
-	const Vec2 dV = V1 * Dot00 - V0 * Dot01;
+	const glm::i32vec2 dU = V0 * Dot11 - V1 * Dot01;
+	const glm::i32vec2 dV = V1 * Dot00 - V0 * Dot01;
 
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Rasterize Scanline
-		Vec2 CurUV = UVStart;
+		glm::i32vec2 CurUV = UVStart;
 		for( std::size_t x = 0 ; x < Width; ++x )
 		{
 			// Test
@@ -523,8 +531,8 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 {
-	const Vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
-	const Vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
+	const glm::i32vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
+	const glm::i32vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
 
 	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
 	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
@@ -539,22 +547,22 @@ void BarycentricFillAVX2(Image& Frame, const Triangle& Tri)
 
 	// Pre-compute starting point, and derivatives for loop
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	const Vec2 StartPoint{XBounds.first,YBounds.first};
-	const Vec2 V2 = StartPoint - Tri.Vert[0];
+	const glm::i32vec2 StartPoint{XBounds.first,YBounds.first};
+	const glm::i32vec2 V2 = StartPoint - Tri.Vert[0];
 	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-	Vec2 UVStart{
+	glm::i32vec2 UVStart{
 		Dot11 * Dot02 - Dot01 * Dot12,
 		Dot00 * Dot12 - Dot01 * Dot02
 	};
 	// Partial derivatives of U and V in terms of CurPoint
-	const Vec2 dU = V0 * Dot11 - V1 * Dot01;
-	const Vec2 dV = V1 * Dot00 - V0 * Dot01;
+	const glm::i32vec2 dU = V0 * Dot11 - V1 * Dot01;
+	const glm::i32vec2 dV = V1 * Dot00 - V0 * Dot01;
 
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
 		// Rasterize Scanline
-		Vec2 CurUV = UVStart;
+		glm::i32vec2 CurUV = UVStart;
 		std::size_t x = 0;
 		// Eight samples at a time
 		// AV512
@@ -799,7 +807,7 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 			const int32x2_t V2 = vsub_s32(CurPoint,CurTri.val[0]);
 			const std::int32_t Dot02 = NEONDot(V0,V2);
 			const std::int32_t Dot12 = NEONDot(V1,V2);
-			//     CrossVec1       CrossVec2
+			//     CrossVec1       Crossglm::i32vec2
 			//        |     DotVec    |     DotVec(Reversed)
 			//        |       |       |       |
 			//        V       V       V       V
@@ -808,7 +816,7 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 			const int32x2_t DotVec = int32x2_t{Dot02, Dot12};
 			const int32x2_t UV = vsub_s32(
 				vmul_s32(CrossVec1,DotVec),
-				vmul_s32(CrossVec2,vrev64_s32(DotVec))
+				vmul_s32(Crossglm::i32vec2,vrev64_s32(DotVec))
 			);
 			const int32_t UVArea = vaddv_s32(UV);
 			const int32_t Compare = vaddv_u32(
@@ -843,12 +851,12 @@ void BarycentricFillNEON(Image& Frame, const Triangle& Tri)
 
 //// Utils
 
-template< bool TestFunc(const Vec2& Point, const Triangle& Tri) >
+template< bool TestFunc(const glm::i32vec2& Point, const Triangle& Tri) >
 void SerialBlit(Image& Frame, const Triangle& Tri)
 {
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	Vec2 CurPoint;
+	glm::i32vec2 CurPoint;
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{
 		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
