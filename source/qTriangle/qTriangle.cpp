@@ -472,25 +472,50 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 
 bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 {
-	const glm::i32vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
-	const glm::i32vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
-	const glm::i32vec2 V2 = Point - Tri.Vert[0];
+	const glm::i32vec2 EdgeDir0 = Tri.Vert[1] - Tri.Vert[0];
+	const glm::i32vec2 EdgeDir1 = Tri.Vert[2] - Tri.Vert[0];
+	const glm::i32vec2 PointDir = Point       - Tri.Vert[0];
 
-	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
-	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
-	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
-	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
-	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
+	// Squared lengths
+	const std::int32_t EdgeDir0SqMag = glm::compAdd(EdgeDir0 * EdgeDir0);
+	const std::int32_t EdgeDir1SqMag = glm::compAdd(EdgeDir1 * EdgeDir1);
 
-	// These are just three determinants
-	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
-	const std::int32_t U    = (Dot11 * Dot02 - Dot01 * Dot12);
-	const std::int32_t V    = (Dot00 * Dot12 - Dot01 * Dot02);
+	// Dot(A,B) = a * b * Dot(U,V)
+	// Product of edge magnitudes when projected upon each other
+	const std::int32_t EdgeDot = glm::compAdd(EdgeDir0 * EdgeDir1);
+	// Length of EdgeDir0 when projected onto PointDir
+	const std::int32_t Edge0PointDot = glm::compAdd(EdgeDir0 * PointDir);
+	// Length of EdgeDir1 when projected onto PointDir
+	const std::int32_t Edge1PointDot = glm::compAdd(EdgeDir1 * PointDir);
+	
+	const std::int32_t U = Det(
+		glm::imat2x2(
+			EdgeDir0SqMag,     EdgeDot,
+			Edge0PointDot, Edge1PointDot
+		)
+	);
+	const std::int32_t V = Det(
+		glm::imat2x2(
+			EdgeDir1SqMag,     EdgeDot,
+			Edge1PointDot, Edge0PointDot
+		)
+	);
 
-	// Convert to local plane's Barycentric coordiante system
+	// At this point we could check if U and V are positive
+	// and early-exit to save us the Area calculation
+
+	const std::int32_t Area = Det(
+		glm::imat2x2(
+			EdgeDir1SqMag, EdgeDot,
+			EdgeDot,   EdgeDir0SqMag
+		)
+	);
+
 	return
-		(U >= 0) &&
-		(V >= 0) &&
+		// Ensures that the point is projected in the positive direction
+		(U >= 0) && (V >= 0)
+		&&
+		// Ensures that the point is within the triangle-surface area
 		(U + V < Area);
 }
 
@@ -520,15 +545,18 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 		Dot11 * Dot02 - Dot01 * Dot12,
 		Dot00 * Dot12 - Dot01 * Dot02
 	};
+
 	// Partial derivatives of U and V in terms of CurPoint
 	const glm::i32vec2 dU = V0 * Dot11 - V1 * Dot01;
 	const glm::i32vec2 dV = V1 * Dot00 - V0 * Dot01;
 
 	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
+		std::size_t x = 0;
 		// Rasterize Scanline
 		glm::i32vec2 CurUV = UVStart;
-		for( std::size_t x = 0 ; x < Width; ++x )
+		// Serial
+		for(; x < Width; ++x )
 		{
 			// Test
 			Dest[x] |= (
