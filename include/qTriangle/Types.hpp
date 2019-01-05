@@ -24,6 +24,7 @@ public:
 
 struct alignas(16) Triangle
 {
+	// Clockwise point order
 	glm::i32vec2 Vert[3];
 };
 }

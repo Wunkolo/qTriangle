@@ -17,10 +17,11 @@ namespace qTri
 // Get Cross-Product Z component from two directional vectors
 // This is just a 2x2 determinant
 inline std::int32_t Det(
-	const glm::imat2x2& Matrix
+	const glm::i32vec2& Top,
+	const glm::i32vec2& Bottom
 )
 {
-	return Matrix[0][0] * Matrix[1][1] - Matrix[1][0] * Matrix[0][1];
+	return Top.x * Bottom.y - Top.y * Bottom.x;
 }
 
 // Cross-product test against each edge, ensuring the area
@@ -31,9 +32,9 @@ bool CrossTest(const glm::i32vec2& Point, const Triangle& Tri)
 	return glm::all(
 		glm::greaterThanEqual(
 			glm::i32vec3(
-				Det(glm::imat2x2(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1])),
-				Det(glm::imat2x2(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2])),
-				Det(glm::imat2x2(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]))
+				Det(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]),
+				Det(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]),
+				Det(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0])
 			),
 			glm::i32vec3(0)
 		)
@@ -78,9 +79,9 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 			};
 
 			const glm::i32vec3 Crosses = glm::vec3(
-				Det( glm::imat2x2( EdgeDir[0], PointDir[0] ) ),
-				Det( glm::imat2x2( EdgeDir[1], PointDir[1] ) ),
-				Det( glm::imat2x2( EdgeDir[2], PointDir[2] ) )
+				Det( EdgeDir[0], PointDir[0] ),
+				Det( EdgeDir[1], PointDir[1] ),
+				Det( EdgeDir[2], PointDir[2] )
 			);
 
 			Fragments[x] |= glm::all(
@@ -472,51 +473,27 @@ void CrossFillNEON(Image& Frame, const Triangle& Tri)
 
 bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 {
-	const glm::i32vec2 EdgeDir0 = Tri.Vert[1] - Tri.Vert[0];
-	const glm::i32vec2 EdgeDir1 = Tri.Vert[2] - Tri.Vert[0];
-	const glm::i32vec2 PointDir = Point       - Tri.Vert[0];
+	const std::int32_t Det01 = Det( Tri.Vert[0], Tri.Vert[1] );
+	const std::int32_t Det20 = Det( Tri.Vert[2], Tri.Vert[0] );
 
-	// Squared lengths
-	const std::int32_t EdgeDir0SqMag = glm::compAdd(EdgeDir0 * EdgeDir0);
-	const std::int32_t EdgeDir1SqMag = glm::compAdd(EdgeDir1 * EdgeDir1);
+	const std::int32_t U =
+		  Det20
+		+ Det( Tri.Vert[0],       Point )
+		+ Det(       Point, Tri.Vert[2] );
+	const std::int32_t V =
+		  Det01
+		+ Det( Tri.Vert[1],       Point )
+		+ Det(       Point, Tri.Vert[0] );
 
-	// Dot(A,B) = a * b * Dot(U,V)
-	// Product of edge magnitudes when projected upon each other
-	const std::int32_t EdgeDot = glm::compAdd(EdgeDir0 * EdgeDir1);
-	// Length of EdgeDir0 when projected onto PointDir
-	const std::int32_t Edge0PointDot = glm::compAdd(EdgeDir0 * PointDir);
-	// Length of EdgeDir1 when projected onto PointDir
-	const std::int32_t Edge1PointDot = glm::compAdd(EdgeDir1 * PointDir);
-	
-	const std::int32_t U = Det(
-		glm::imat2x2(
-			EdgeDir0SqMag,     EdgeDot,
-			Edge0PointDot, Edge1PointDot
-		)
-	);
-	const std::int32_t V = Det(
-		glm::imat2x2(
-			EdgeDir1SqMag,     EdgeDot,
-			Edge1PointDot, Edge0PointDot
-		)
-	);
+	if( U < 0 || V < 0 )
+	{
+		return false;
+	}
 
-	// At this point we could check if U and V are positive
-	// and early-exit to save us the Area calculation
+	const std::int32_t Area =
+		Det( Tri.Vert[1], Tri.Vert[2] ) + Det20 + Det01;
 
-	const std::int32_t Area = Det(
-		glm::imat2x2(
-			EdgeDir1SqMag, EdgeDot,
-			EdgeDot,   EdgeDir0SqMag
-		)
-	);
-
-	return
-		// Ensures that the point is projected in the positive direction
-		(U >= 0) && (V >= 0)
-		&&
-		// Ensures that the point is within the triangle-surface area
-		(U + V < Area);
+	return (U + V) < Area;
 }
 
 void BarycentricFill(Image& Frame, const Triangle& Tri)
