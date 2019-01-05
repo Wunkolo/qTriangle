@@ -62,6 +62,10 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 		// Iterate columns within scanline
 		std::size_t x = 0;
 
+		///
+		// SIMD stuff would go here
+		///
+
 		// Serial
 		for( ; x < Width; x += 1 )
 		{
@@ -102,13 +106,11 @@ bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 	const std::int32_t Det01 = Det( Tri[0], Tri[1] );
 	const std::int32_t Det20 = Det( Tri[2], Tri[0] );
 
-	const std::int32_t U =
-		  Det20
-		+ Det( Tri[0],       Point )
+	const std::int32_t U = Det20
+		+ Det(      Tri[0],  Point )
 		+ Det(       Point, Tri[2] );
-	const std::int32_t V =
-		  Det01
-		+ Det( Tri[1],       Point )
+	const std::int32_t V = Det01
+		+ Det(      Tri[1],  Point )
 		+ Det(       Point, Tri[0] );
 
 	if( U < 0 || V < 0 )
@@ -116,66 +118,58 @@ bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 		return false;
 	}
 
-	const std::int32_t Area =
-		Det( Tri[1], Tri[2] ) + Det20 + Det01;
+	const std::int32_t Area = Det( Tri[1], Tri[2] ) + Det20 + Det01;
 
 	return (U + V) < Area;
 }
 
 void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
-	const glm::i32vec2 V0 = Tri[2] - Tri[0];
-	const glm::i32vec2 V1 = Tri[1] - Tri[0];
-
-	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
-	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
-	const std::int32_t Dot01 = glm::compAdd(V0 * V1);
-
-	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
-
+	const std::int32_t Det01 = Det( Tri[0], Tri[1] );
+	const std::int32_t Det20 = Det( Tri[2], Tri[0] );
+	const std::int32_t Area  = Det( Tri[1], Tri[2] ) + Det20 + Det01;
 	const auto XBounds = std::minmax({Tri[0].x, Tri[1].x, Tri[2].x});
 	const auto YBounds = std::minmax({Tri[0].y, Tri[1].y, Tri[2].y});
-	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	// Bounds width and height
+	const std::size_t Width  = static_cast<std::size_t>(XBounds.second - XBounds.first);
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
-	// Pre-compute starting point, and derivatives for loop
-	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	const glm::i32vec2 StartPoint{XBounds.first,YBounds.first};
-	const glm::i32vec2 V2 = StartPoint - Tri[0];
-	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
-	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
-	glm::i32vec2 UVStart{
-		Dot11 * Dot02 - Dot01 * Dot12,
-		Dot00 * Dot12 - Dot01 * Dot02
-	};
+	// Pre-offset the output buffer by the bounds of the triangle
+	std::uint8_t* Fragments = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
 
-	// Partial derivatives of U and V in terms of CurPoint
-	const glm::i32vec2 dU = V0 * Dot11 - V1 * Dot01;
-	const glm::i32vec2 dV = V1 * Dot00 - V0 * Dot01;
+	// Point being tested against
+	glm::i32vec2 CurPoint(XBounds.first,YBounds.first);
 
-	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
+	// Iterate scanlines
+	for( std::size_t y = 0; y < Height; ++y )
 	{
+		// Iterate columns within scanline
 		std::size_t x = 0;
-		// Rasterize Scanline
-		glm::i32vec2 CurUV = UVStart;
+
+		///
+		// SIMD stuff would go here
+		///
+
 		// Serial
-		for(; x < Width; ++x )
+		for( ; x < Width; x += 1 )
 		{
-			// Test
-			Dest[x] |= (
-				(CurUV.x >= 0) &&
-				(CurUV.y >= 0) &&
-				(CurUV.x + CurUV.y < Area)
-			);
+			const std::int32_t U = Det20
+				+ Det(      Tri[0],  CurPoint )
+				+ Det(    CurPoint,    Tri[2] );
+			const std::int32_t V = Det01
+				+ Det(      Tri[1],  CurPoint )
+				+ Det(    CurPoint,    Tri[0] );
 
-			// Integrate
-			CurUV.x += dU.x;
-			CurUV.y += dV.x;
+			Fragments[x] |= (U + V) < Area && U >= 0 && V >= 0;
+			// Increment to next pixel
+			CurPoint.x += 1;
 		}
-
-		// Integrate
-		UVStart.x += dU.y;
-		UVStart.y += dV.y;
+		// Offset output buffer to next scanline
+		Fragments += Frame.Width;
+		// Increment to next row
+		CurPoint.y += 1;
+		// Move X coordinate back to left-most side
+		CurPoint.x = XBounds.first;
 	}
 }
 //// Utils
