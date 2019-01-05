@@ -5,10 +5,6 @@
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/scalar_relational.hpp>
 
-#ifdef __AVX2__
-#include <immintrin.h>
-#endif
-
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 #endif
@@ -52,10 +48,15 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	glm::i32vec2 CurPoint;
-	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
+	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+	glm::i32vec2 CurPoint(XBounds.first,YBounds.first);
+	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
 	{
-		for( CurPoint.x = XBounds.first; CurPoint.x < XBounds.second; ++CurPoint.x )
+		std::size_t x = 0;
+		// Serial
+		for( ; x < Width; ++x )
 		{
 			const glm::i32vec2 PointDir[3] = {
 				CurPoint - Tri.Vert[0],
@@ -75,7 +76,13 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 					glm::i32vec3(0)
 				)
 			);
+			// Increment to next pixel
+			CurPoint += glm::i32vec2(1,0);
 		}
+		// Increment to next row
+		CurPoint += glm::i32vec2(0,1);
+		// Move X coordiante back to left-most side
+		CurPoint.x = XBounds.first;
 	}
 }
 
@@ -877,21 +884,21 @@ const char*
 	// Cross-Product methods
 	{SerialBlit<CrossTest>,		"Serial-CrossProduct"},
 	{CrossFill,					"Serial-CrossProductFill"},
-#ifdef __AVX2__
-	{ CrossFillAVX2,			"AVX2-CrossProductFill" },
-#endif
-#ifdef __ARM_NEON
-	{ CrossFillNEON,			"NEON-CrossProductFill" },
-#endif
+// #ifdef __AVX2__
+// 	{ CrossFillAVX2,			"AVX2-CrossProductFill" },
+// #endif
+// #ifdef __ARM_NEON
+// 	{ CrossFillNEON,			"NEON-CrossProductFill" },
+// #endif
 	// Barycentric methods
 	{SerialBlit<Barycentric>,	"Serial-Barycentric"},
 	{BarycentricFill,			"Serial-BarycentricFill"},
-#ifdef __AVX2__
-	{ BarycentricFillAVX2,		"AVX2-BarycentricFill"  },
-#endif
-#ifdef __ARM_NEON
-	{ BarycentricFillNEON,		"NEON-BarycentricFill"  },
-#endif
+// #ifdef __AVX2__
+// 	{ BarycentricFillAVX2,		"AVX2-BarycentricFill"  },
+// #endif
+// #ifdef __ARM_NEON
+// 	{ BarycentricFillNEON,		"NEON-BarycentricFill"  },
+// #endif
 };
 }
 
