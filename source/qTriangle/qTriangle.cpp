@@ -2,6 +2,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_integer.hpp>
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/scalar_relational.hpp>
 
@@ -13,11 +14,13 @@ namespace qTri
 {
 //// Cross Product Method
 
-// Get Cross-Product Z component from two directiona vectors
+// Get Cross-Product Z component from two directional vectors
 // This is just a 2x2 determinant
-inline std::int32_t CrossArea(const glm::i32vec2& DirA, const glm::i32vec2& DirB)
+inline std::int32_t Det(
+	const glm::imat2x2& Matrix
+)
 {
-	return DirA.x * DirB.y - DirA.y * DirB.x;
+	return Matrix[0][0] * Matrix[1][1] - Matrix[1][0] * Matrix[0][1];
 }
 
 // Cross-product test against each edge, ensuring the area
@@ -25,38 +28,48 @@ inline std::int32_t CrossArea(const glm::i32vec2& DirA, const glm::i32vec2& DirB
 // Requires that the triangle is in clockwise order
 bool CrossTest(const glm::i32vec2& Point, const Triangle& Tri)
 {
-	return
-		glm::all(
-			glm::greaterThanEqual(
-				glm::i32vec3(
-					CrossArea(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]),
-					CrossArea(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]),
-					CrossArea(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0])
-				),
-				glm::i32vec3(0)
-			)
-		);
+	return glm::all(
+		glm::greaterThanEqual(
+			glm::i32vec3(
+				Det(glm::imat2x2(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1])),
+				Det(glm::imat2x2(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2])),
+				Det(glm::imat2x2(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0]))
+			),
+			glm::i32vec3(0)
+		)
+	);
 }
 
 void CrossFill(Image& Frame, const Triangle& Tri)
 {
+	// Directional vectors along all three triangle edges
 	const glm::i32vec2 EdgeDir[3] = {
 		Tri.Vert[1] - Tri.Vert[0],
 		Tri.Vert[2] - Tri.Vert[1],
 		Tri.Vert[0] - Tri.Vert[2]
 	};
 
+	// Calculate triangle bounds
 	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
 	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
-	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
+	// Bounds width and height
+	const std::size_t Width  = static_cast<std::size_t>(XBounds.second - XBounds.first);
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
+
+	// Pre-offset the output buffer by the bounds of the triangle
+	std::uint8_t* Fragments = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
+
+	// Point being tested against
 	glm::i32vec2 CurPoint(XBounds.first,YBounds.first);
-	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
-	for( std::size_t y = 0; y < Height; ++y, Dest += Frame.Width )
+
+	// Iterate scanlines
+	for( std::size_t y = 0; y < Height; ++y )
 	{
+		// Iterate columns within scanline
 		std::size_t x = 0;
+
 		// Serial
-		for( ; x < Width; ++x )
+		for( ; x < Width; x += 1 )
 		{
 			const glm::i32vec2 PointDir[3] = {
 				CurPoint - Tri.Vert[0],
@@ -65,23 +78,25 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 			};
 
 			const glm::i32vec3 Crosses = glm::vec3(
-				CrossArea( EdgeDir[0], PointDir[0] ),
-				CrossArea( EdgeDir[1], PointDir[1] ),
-				CrossArea( EdgeDir[2], PointDir[2] )
+				Det( glm::imat2x2( EdgeDir[0], PointDir[0] ) ),
+				Det( glm::imat2x2( EdgeDir[1], PointDir[1] ) ),
+				Det( glm::imat2x2( EdgeDir[2], PointDir[2] ) )
 			);
 
-			Frame.Pixels[CurPoint.x + CurPoint.y * Frame.Width] |= glm::all(
+			Fragments[x] |= glm::all(
 				glm::greaterThanEqual(
 					Crosses,
 					glm::i32vec3(0)
 				)
 			);
 			// Increment to next pixel
-			CurPoint += glm::i32vec2(1,0);
+			CurPoint.x += 1;
 		}
+		// Offset output buffer to next scanline
+		Fragments += Frame.Width;
 		// Increment to next row
-		CurPoint += glm::i32vec2(0,1);
-		// Move X coordiante back to left-most side
+		CurPoint.y += 1;
+		// Move X coordinate back to left-most side
 		CurPoint.x = XBounds.first;
 	}
 }
@@ -883,7 +898,7 @@ const char*
 > FillAlgorithms = {
 	// Cross-Product methods
 	{SerialBlit<CrossTest>,		"Serial-CrossProduct"},
-	{CrossFill,					"Serial-CrossProductFill"},
+	{CrossFill,					"CrossProductFill"},
 // #ifdef __AVX2__
 // 	{ CrossFillAVX2,			"AVX2-CrossProductFill" },
 // #endif
@@ -892,7 +907,7 @@ const char*
 // #endif
 	// Barycentric methods
 	{SerialBlit<Barycentric>,	"Serial-Barycentric"},
-	{BarycentricFill,			"Serial-BarycentricFill"},
+	{BarycentricFill,			"BarycentricFill"},
 // #ifdef __AVX2__
 // 	{ BarycentricFillAVX2,		"AVX2-BarycentricFill"  },
 // #endif
