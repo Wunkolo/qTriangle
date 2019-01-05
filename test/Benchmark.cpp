@@ -50,9 +50,9 @@ int main()
 	std::uniform_int_distribution<std::int32_t> HeightDis(0, Height);
 	for( qTri::Triangle& CurTriangle : Triangles )
 	{
-		qTri::Vec2 Center{};
+		glm::i32vec2 Center{};
 		// Randomly place vertices
-		for( qTri::Vec2& CurVert : CurTriangle.Vert )
+		for( glm::i32vec2& CurVert : CurTriangle.Vert )
 		{
 			CurVert.x = WidthDis(RandomEngine);
 			CurVert.y = HeightDis(RandomEngine);
@@ -63,11 +63,11 @@ int main()
 		std::sort(
 			std::begin(CurTriangle.Vert),
 			std::end(CurTriangle.Vert),
-			[&Center](const qTri::Vec2& A, const qTri::Vec2& B) -> bool
+			[&Center](const glm::i32vec2& A, const glm::i32vec2& B) -> bool
 				{
 					// Sort points by its angle from the center
-					const qTri::Vec2 DirectionA = Center - A;
-					const qTri::Vec2 DirectionB = Center - B;
+					const glm::i32vec2 DirectionA = Center - A;
+					const glm::i32vec2 DirectionB = Center - B;
 					const auto AngleA = glm::atan<glm::float32_t>(DirectionA.y, DirectionA.x);
 					const auto AngleB = glm::atan<glm::float32_t>(DirectionB.y, DirectionB.x);
 					return AngleA < AngleB;
