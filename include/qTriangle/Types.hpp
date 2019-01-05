@@ -1,6 +1,7 @@
 #pragma once
 #include <tuple>
 #include <vector>
+#include <array>
 
 #include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
@@ -22,9 +23,5 @@ public:
 	std::vector<std::uint8_t> Pixels;
 };
 
-struct alignas(16) Triangle
-{
-	// Clockwise point order
-	glm::i32vec2 Vert[3];
-};
+using Triangle = std::array<glm::i32vec2,3>;
 }

@@ -3,7 +3,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtx/component_wise.hpp>
-#include <glm/gtx/scalar_relational.hpp>
 
 namespace qTri
 {
@@ -26,9 +25,9 @@ bool CrossTest(const glm::i32vec2& Point, const Triangle& Tri)
 	return glm::all(
 		glm::greaterThanEqual(
 			glm::i32vec3(
-				Det(Tri.Vert[1] - Tri.Vert[0], Point - Tri.Vert[1]),
-				Det(Tri.Vert[2] - Tri.Vert[1], Point - Tri.Vert[2]),
-				Det(Tri.Vert[0] - Tri.Vert[2], Point - Tri.Vert[0])
+				Det(Tri[1] - Tri[0], Point - Tri[1]),
+				Det(Tri[2] - Tri[1], Point - Tri[2]),
+				Det(Tri[0] - Tri[2], Point - Tri[0])
 			),
 			glm::i32vec3(0)
 		)
@@ -39,14 +38,14 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 {
 	// Directional vectors along all three triangle edges
 	const glm::i32vec2 EdgeDir[3] = {
-		Tri.Vert[1] - Tri.Vert[0],
-		Tri.Vert[2] - Tri.Vert[1],
-		Tri.Vert[0] - Tri.Vert[2]
+		Tri[1] - Tri[0],
+		Tri[2] - Tri[1],
+		Tri[0] - Tri[2]
 	};
 
 	// Calculate triangle bounds
-	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
-	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const auto XBounds = std::minmax({Tri[0].x, Tri[1].x, Tri[2].x});
+	const auto YBounds = std::minmax({Tri[0].y, Tri[1].y, Tri[2].y});
 	// Bounds width and height
 	const std::size_t Width  = static_cast<std::size_t>(XBounds.second - XBounds.first);
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
@@ -67,9 +66,9 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 		for( ; x < Width; x += 1 )
 		{
 			const glm::i32vec2 PointDir[3] = {
-				CurPoint - Tri.Vert[0],
-				CurPoint - Tri.Vert[1],
-				CurPoint - Tri.Vert[2]
+				CurPoint - Tri[0],
+				CurPoint - Tri[1],
+				CurPoint - Tri[2]
 			};
 
 			const glm::i32vec3 Crosses = glm::vec3(
@@ -100,17 +99,17 @@ void CrossFill(Image& Frame, const Triangle& Tri)
 
 bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 {
-	const std::int32_t Det01 = Det( Tri.Vert[0], Tri.Vert[1] );
-	const std::int32_t Det20 = Det( Tri.Vert[2], Tri.Vert[0] );
+	const std::int32_t Det01 = Det( Tri[0], Tri[1] );
+	const std::int32_t Det20 = Det( Tri[2], Tri[0] );
 
 	const std::int32_t U =
 		  Det20
-		+ Det( Tri.Vert[0],       Point )
-		+ Det(       Point, Tri.Vert[2] );
+		+ Det( Tri[0],       Point )
+		+ Det(       Point, Tri[2] );
 	const std::int32_t V =
 		  Det01
-		+ Det( Tri.Vert[1],       Point )
-		+ Det(       Point, Tri.Vert[0] );
+		+ Det( Tri[1],       Point )
+		+ Det(       Point, Tri[0] );
 
 	if( U < 0 || V < 0 )
 	{
@@ -118,15 +117,15 @@ bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
 	}
 
 	const std::int32_t Area =
-		Det( Tri.Vert[1], Tri.Vert[2] ) + Det20 + Det01;
+		Det( Tri[1], Tri[2] ) + Det20 + Det01;
 
 	return (U + V) < Area;
 }
 
 void BarycentricFill(Image& Frame, const Triangle& Tri)
 {
-	const glm::i32vec2 V0 = Tri.Vert[2] - Tri.Vert[0];
-	const glm::i32vec2 V1 = Tri.Vert[1] - Tri.Vert[0];
+	const glm::i32vec2 V0 = Tri[2] - Tri[0];
+	const glm::i32vec2 V1 = Tri[1] - Tri[0];
 
 	const std::int32_t Dot00 = glm::compAdd(V0 * V0);
 	const std::int32_t Dot11 = glm::compAdd(V1 * V1);
@@ -134,15 +133,15 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 
 	const std::int32_t Area = (Dot00 * Dot11 - Dot01 * Dot01);
 
-	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
-	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const auto XBounds = std::minmax({Tri[0].x, Tri[1].x, Tri[2].x});
+	const auto YBounds = std::minmax({Tri[0].y, Tri[1].y, Tri[2].y});
 	const std::size_t Width = static_cast<std::size_t>(XBounds.second - XBounds.first);
 	const std::size_t Height = static_cast<std::size_t>(YBounds.second - YBounds.first);
 
 	// Pre-compute starting point, and derivatives for loop
 	std::uint8_t* Dest = &Frame.Pixels[XBounds.first + YBounds.first * Frame.Width];
 	const glm::i32vec2 StartPoint{XBounds.first,YBounds.first};
-	const glm::i32vec2 V2 = StartPoint - Tri.Vert[0];
+	const glm::i32vec2 V2 = StartPoint - Tri[0];
 	const std::int32_t Dot02 = glm::compAdd(V0 * V2);
 	const std::int32_t Dot12 = glm::compAdd(V1 * V2);
 	glm::i32vec2 UVStart{
@@ -184,8 +183,8 @@ void BarycentricFill(Image& Frame, const Triangle& Tri)
 template< bool TestFunc(const glm::i32vec2& Point, const Triangle& Tri) >
 void SerialBlit(Image& Frame, const Triangle& Tri)
 {
-	const auto XBounds = std::minmax({Tri.Vert[0].x, Tri.Vert[1].x, Tri.Vert[2].x});
-	const auto YBounds = std::minmax({Tri.Vert[0].y, Tri.Vert[1].y, Tri.Vert[2].y});
+	const auto XBounds = std::minmax({Tri[0].x, Tri[1].x, Tri[2].x});
+	const auto YBounds = std::minmax({Tri[0].y, Tri[1].y, Tri[2].y});
 	glm::i32vec2 CurPoint;
 	for( CurPoint.y = YBounds.first; CurPoint.y < YBounds.second; ++CurPoint.y )
 	{

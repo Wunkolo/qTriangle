@@ -77,13 +77,13 @@ int main()
 			}
 		};
 		const glm::i32vec2 Center = std::accumulate(
-			std::cbegin(Triangles[i].Vert),
-			std::cend(Triangles[i].Vert),
+			std::cbegin(Triangles[i]),
+			std::cend(Triangles[i]),
 			glm::i32vec2{0,0}
 		) / 3;
 		std::sort(
-			std::begin(Triangles[i].Vert),
-			std::end(Triangles[i].Vert),
+			std::begin(Triangles[i]),
+			std::end(Triangles[i]),
 			[&Center](const glm::i32vec2& A, const glm::i32vec2& B) -> bool
 				{
 					// Sort points by its angle from the center

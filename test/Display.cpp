@@ -54,7 +54,7 @@ int main()
 	{
 		glm::i32vec2 Center{};
 		// Randomly place vertices
-		for( glm::i32vec2& CurVert : CurTriangle.Vert )
+		for( glm::i32vec2& CurVert : CurTriangle )
 		{
 			CurVert.x = WidthDis(RandomEngine);
 			CurVert.y = HeightDis(RandomEngine);
@@ -63,8 +63,8 @@ int main()
 		// Sort points in clockwise order
 		Center /= 3;
 		std::sort(
-			std::begin(CurTriangle.Vert),
-			std::end(CurTriangle.Vert),
+			std::begin(CurTriangle),
+			std::end(CurTriangle),
 			[&Center](const glm::i32vec2& A, const glm::i32vec2& B) -> bool
 				{
 					// Points that have a larger angle away from the center are "heavier"
