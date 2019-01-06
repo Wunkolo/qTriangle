@@ -81,6 +81,9 @@ inline void BarycentricMethod(
 	);
 }
 
+#if defined(__x86_64__) || defined(_M_X64)
+#include "qTriangle-x86.hpp"
+#else
 // Serial
 template<>
 inline void BarycentricMethod<0>(
@@ -104,6 +107,7 @@ inline void BarycentricMethod<0>(
 		Results[i] |= (U + V) < Area && U >= 0 && V >= 0;
 	}
 }
+#endif
 
 //// Exports
 
