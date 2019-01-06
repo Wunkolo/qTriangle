@@ -6,7 +6,6 @@
 
 namespace qTri
 {
-//// Cross Product Method
 
 // Get Cross-Product Z component from two directional vectors
 inline std::int32_t Det(
@@ -17,24 +16,23 @@ inline std::int32_t Det(
 	return Top.x * Bottom.y - Top.y * Bottom.x;
 }
 
-// Cross-product test against each edge, ensuring the area
-// of each parallelogram is positive
-// Requires that the triangle is in clockwise order
-inline bool CrossTest(const glm::i32vec2& Point, const Triangle& Tri)
+//// Cross Product Method
+
+template<std::uint8_t WidthExp2>
+inline void CrossProductMethod(
+	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
+	const Triangle& Tri
+)
 {
-	return glm::all(
-		glm::greaterThanEqual(
-			glm::i32vec3(
-				Det(Tri[1] - Tri[0], Point - Tri[1]),
-				Det(Tri[2] - Tri[1], Point - Tri[2]),
-				Det(Tri[0] - Tri[2], Point - Tri[0])
-			),
-			glm::i32vec3(0)
-		)
+	CrossProductMethod<WidthExp2-1>(
+		Points, Results, Count,
+		Tri
 	);
 }
 
-void CrossFill(
+// Serial
+template<>
+inline void CrossProductMethod<0>(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
 	const Triangle& Tri
 )
@@ -46,15 +44,7 @@ void CrossFill(
 		Tri[0] - Tri[2]
 	};
 
-	// Iterate columns within scanline
-	std::size_t i = 0;
-
-	///
-	// SIMD stuff would go here
-	///
-
-	// Serial
-	for( ; i < Count; ++i )
+	for( std::size_t i = 0; i < Count; ++i )
 	{
 		const glm::i32vec2 PointDir[3] = {
 			Points[i] - Tri[0],
@@ -79,29 +69,21 @@ void CrossFill(
 
 //// Barycentric Method
 
-inline bool Barycentric(const glm::i32vec2& Point, const Triangle& Tri)
+template<std::uint8_t WidthExp2>
+inline void BarycentricMethod(
+	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
+	const Triangle& Tri
+)
 {
-	const std::int32_t Det01 = Det( Tri[0], Tri[1] );
-	const std::int32_t Det20 = Det( Tri[2], Tri[0] );
-
-	const std::int32_t U = Det20
-		+ Det(      Tri[0],  Point )
-		+ Det(       Point, Tri[2] );
-	const std::int32_t V = Det01
-		+ Det(      Tri[1],  Point )
-		+ Det(       Point, Tri[0] );
-
-	if( U < 0 || V < 0 )
-	{
-		return false;
-	}
-
-	const std::int32_t Area = Det( Tri[1], Tri[2] ) + Det20 + Det01;
-
-	return (U + V) < Area;
+	BarycentricMethod<WidthExp2-1>(
+		Points, Results, Count,
+		Tri
+	);
 }
 
-void BarycentricFill(
+// Serial
+template<>
+inline void BarycentricMethod<0>(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
 	const Triangle& Tri
 )
@@ -110,39 +92,16 @@ void BarycentricFill(
 	const std::int32_t Det20 = Det( Tri[2], Tri[0] );
 	const std::int32_t Area  = Det( Tri[1], Tri[2] ) + Det20 + Det01;
 
-	std::size_t i = 0;
-
-	///
-	// SIMD stuff would go here
-	///
-
-	// Serial
-	for( ; i < Count; ++i )
+	for( std::size_t i = 0; i < Count; ++i )
 	{
 		const std::int32_t U = Det20
-			+ Det(      Tri[0], Points[i] )
-			+ Det(   Points[i],    Tri[2] );
+			+ Det(    Tri[0], Points[i] )
+			+ Det( Points[i],    Tri[2] );
 		const std::int32_t V = Det01
-			+ Det(      Tri[1], Points[i] )
-			+ Det(   Points[i],    Tri[0] );
+			+ Det(    Tri[1], Points[i] )
+			+ Det( Points[i],    Tri[0] );
 
 		Results[i] |= (U + V) < Area && U >= 0 && V >= 0;
-	}
-}
-
-//// Utils
-
-template< bool TestFunc(const glm::i32vec2& Point, const Triangle& Tri) >
-void SerialBlit(
-	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
-	const Triangle& Tri
-)
-{
-	std::size_t i = 0;
-	// Serial
-	for( ; i < Count; ++i )
-	{
-		Results[i] |= TestFunc(Points[i],Tri);
 	}
 }
 
@@ -158,11 +117,11 @@ const std::vector<
 	>
 > FillAlgorithms = {
 	// Cross-Product methods
-	{SerialBlit<CrossTest>,		"Serial-CrossProduct"},
-	{CrossFill,					"CrossProductFill"},
+	{CrossProductMethod<  0>,	"Serial-CrossProduct"},
+	{CrossProductMethod< -1>,	"CrossProductMethod"},
 	// Barycentric methods
-	{SerialBlit<Barycentric>,	"Serial-Barycentric"},
-	{BarycentricFill,			"BarycentricFill"},
+	{BarycentricMethod<  0>,	"Serial-Barycentric"},
+	{BarycentricMethod< -1>,	"BarycentricMethod"},
 };
 }
 
