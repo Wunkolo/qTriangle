@@ -85,6 +85,15 @@ int main()
 	std::printf(
 		"Algorithm | Average per triangle(ns)\n"
 	);
+	// Generate 2d grid of points to test against
+	std::vector<glm::i32vec2> FragCoords;
+	for( std::size_t y = 0; y < Height; ++y )
+	{
+		for( std::size_t x = 0; x < Width; ++x )
+		{
+			FragCoords.emplace_back(x,y);
+		}
+	}
 	// Benchmark each algorithm against all triangles
 	for( const auto& FillAlgorithm : qTri::FillAlgorithms )
 	{
@@ -100,7 +109,9 @@ int main()
 			{
 				ExecTime += Bench<>::Duration(
 					FillAlgorithm.first,
-					CurFrame,
+					FragCoords.data(),
+					CurFrame.Pixels.data(),
+					FragCoords.size(),
 					CurTriangle
 				).count();
 			}

@@ -12,8 +12,11 @@ namespace qTri
 {
 extern const std::vector<
 	std::pair<
-		void(* const)(qTri::Image&, const qTri::Triangle&), // Function Pointer
-		const char*                                         // Algorithm Name
+		void(* const)(
+			const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
+			const Triangle& Tri
+		),
+		const char*
 	>
 > FillAlgorithms;
 }

@@ -95,6 +95,15 @@ int main()
 				}
 		);
 	}
+	// Generate 2d grid of points to test against
+	std::vector<glm::i32vec2> FragCoords;
+	for( std::size_t y = 0; y < Height; ++y )
+	{
+		for( std::size_t x = 0; x < Width; ++x )
+		{
+			FragCoords.emplace_back(x,y);
+		}
+	}
 
 	for( const auto& FillAlgorithm : qTri::FillAlgorithms )
 	{
@@ -110,7 +119,12 @@ int main()
 		{
 			qTri::Image CurInversion(Width, Height);
 			// Render triangle to inversion mask
-			FillAlgorithm.first(CurInversion, CurTriangle);
+			FillAlgorithm.first(
+				FragCoords.data(),
+				CurInversion.Pixels.data(),
+				FragCoords.size(),
+				CurTriangle
+			);
 
 			// Append inversion mask
 			for( std::size_t i = 0; i < Width * Height; ++i )
