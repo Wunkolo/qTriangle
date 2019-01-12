@@ -152,14 +152,12 @@ void BarycentricMethod<0>(
 		const __m128i Point = _mm_set1_epi64x(
 			*reinterpret_cast<const std::uint64_t*>(Points + i)
 		);
-		// XYXY
-		const __m128i PointXYXY= _mm_shuffle_epi32(
+		const __m128i PointYXXY= _mm_shuffle_epi32(
 			Point,
-			0b00'01'00'01
+			0b01'00'00'01
 		);
-		const __m128i PointXYYX = _mm_shuffle_epi32(
-			Point,
-			0b00'01'01'00
+		const __m128i PointXYYX = _mm_alignr_epi8(
+			PointYXXY,PointYXXY,8
 		);
 
 		// U:
@@ -217,7 +215,7 @@ void BarycentricMethod<0>(
 		// |  Det01   |  Det20   ]
 		// |    V0    |    U0    |
 
-		// |  Point.y |  Point.x |  Point.x |  Point.y | xyxy
+		// |  Point.y |  Point.x |  Point.x |  Point.y | yxxy
 		// |    *     |    *     |    *     |    *     |
 		// | Tri[1].x | Tri[0].y | Tri[2].y | Tri[0].x | < out of loop
 		// |    -     |    -     |    -     |    -     |
@@ -230,7 +228,7 @@ void BarycentricMethod<0>(
 		// |    V     |    U     |    V     |    U     |
 		__m128i VU = _mm_sub_epi32(
 			_mm_mullo_epi32(
-				PointXYXY,
+				PointYXXY,
 				ConstVec_1x0y2y0x //1x'0y'2y'0x
 			),
 			_mm_mullo_epi32(
@@ -238,6 +236,7 @@ void BarycentricMethod<0>(
 				ConstVec_1y0x2x0y //1y'0x'2x'0y
 			)
 		);
+
 		VU = _mm_add_epi32(
 			_mm_hadd_epi32(
 				VU, VU
