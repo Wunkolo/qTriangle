@@ -30,7 +30,23 @@ inline void CrossProductMethod(
 	);
 }
 
-// Serial
+//// Barycentric Method
+
+template<std::uint8_t WidthExp2>
+inline void BarycentricMethod(
+	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
+	const Triangle& Tri
+)
+{
+	BarycentricMethod<WidthExp2-1>(
+		Points, Results, Count,
+		Tri
+	);
+}
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include "qTriangle-x86.hpp"
+#else
 template<>
 inline void CrossProductMethod<0>(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
@@ -67,24 +83,6 @@ inline void CrossProductMethod<0>(
 	}
 }
 
-//// Barycentric Method
-
-template<std::uint8_t WidthExp2>
-inline void BarycentricMethod(
-	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
-	const Triangle& Tri
-)
-{
-	BarycentricMethod<WidthExp2-1>(
-		Points, Results, Count,
-		Tri
-	);
-}
-
-#if defined(__x86_64__) || defined(_M_X64)
-#include "qTriangle-x86.hpp"
-#else
-// Serial
 template<>
 inline void BarycentricMethod<0>(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
