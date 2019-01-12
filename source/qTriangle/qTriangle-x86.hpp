@@ -128,11 +128,14 @@ void BarycentricMethod<0>(
 	);
 
 	// Area: Tri[2].y * Tri[1].x - Tri[2].x * Tri[1].y
+	//       + Det20 + Det01
 
 	// | Tri[2].x | Tri[2].y | Tri[2].x | Tri[2].y |
 	// |    *     |    *     |    *     |    *     |
 	// | Tri[1].y | Tri[1].x | Tri[1].y | Tri[1].x |
 	// |         hsub        |         hsub        |
+	// |    +     |    +     |    +     |    +     |
+	// hadd([  Det01  ,  Det20    ,  Det01   ,  Det20   ]_
 	// [  Area   ,  Area     ,  Area    ,  Area    ]
 	const __m128i AreaProduct = _mm_mullo_epi32(
 		_mm_shuffle_epi32(
@@ -142,8 +145,13 @@ void BarycentricMethod<0>(
 			Tri10, 0b11'10'11'10
 		)
 	);
-	const __m128i Area = _mm_hsub_epi32(
-		AreaProduct, AreaProduct
+	const __m128i Area = _mm_add_epi32(
+		_mm_hsub_epi32(
+			AreaProduct, AreaProduct
+		),
+		_mm_hadd_epi32(
+			Det0120,Det0120
+		)
 	);
 
 	for( std::size_t i = 0; i < Count; ++i )
@@ -250,6 +258,7 @@ void BarycentricMethod<0>(
 			),
 			Area
 		);
+
 		// U >= 0 = !(U < 0)
 		const auto SignCheck = _mm_cmplt_epi32(
 			VU, _mm_setzero_si128()
