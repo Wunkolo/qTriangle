@@ -67,7 +67,7 @@ inline void CrossProductMethod<0>(
 }
 
 template<>
-void BarycentricMethod<0>(
+inline void BarycentricMethod<0>(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
 	const qTri::Triangle& Tri
 )
@@ -135,8 +135,10 @@ void BarycentricMethod<0>(
 	// | Tri[1].y | Tri[1].x | Tri[1].y | Tri[1].x |
 	// |         hsub        |         hsub        |
 	// |    +     |    +     |    +     |    +     |
-	// hadd([  Det01  ,  Det20    ,  Det01   ,  Det20   ]_
-	// [  Area   ,  Area     ,  Area    ,  Area    ]
+	// [  Det01   | Det01    |  Det01   |  Det01   ]
+	// |    +     |    +     |    +     |    +     |
+	// [  Det20   | Det20    |  Det20   |  Det20   ]
+	// [  Area    |  Area    |  Area    |  Area    ]
 	const __m128i AreaProduct = _mm_mullo_epi32(
 		_mm_shuffle_epi32(
 			Tri22, 0b00'01'00'01
@@ -152,6 +154,16 @@ void BarycentricMethod<0>(
 		_mm_hadd_epi32(
 			Det0120,Det0120
 		)
+	);
+
+	// [Area-1, Area-1, 0,0]
+	const __m128i CheckConst = _mm_blend_epi16(
+		_mm_setzero_si128(),
+		_mm_sub_epi32( // Area - 1
+			Area,
+			_mm_set1_epi32(1)
+		),
+		0b11'11'00'00
 	);
 
 	for( std::size_t i = 0; i < Count; ++i )
@@ -184,56 +196,61 @@ void BarycentricMethod<0>(
 		// here for reference
 		// |  Point.x |  Point.y |  Point.x |  Point.y |
 		// |    *     |    *     |    *     |    *     |
-		// [ Tri[0].y | Tri[0].x | Tri[0].y | Tri[0].x ] < out of loop
+		// [ Tri[0].y | Tri[0].x | Tri[0].y | Tri[0].x ] < const
 		// |    -     |    -     |    -     |    -     |
 		// |  Point.y |  Point.x |  Point.y |  Point.x |
 		// |    *     |    *     |    *     |    *     |
-		// [ Tri[0].x | Tri[0].y | Tri[0].x | Tri[0].y ] < out of loop
+		// [ Tri[0].x | Tri[0].y | Tri[0].x | Tri[0].y ] < const
 		// |    +     |    +     |    +     |    +     |
 		// |  Point.y |  Point.x |  Point.y |  Point.x |
 		// |    *     |    *     |    *     |    *     |
-		// [ Tri[1].x | Tri[2].y | Tri[1].x | Tri[2].y ] < out of loop
+		// [ Tri[1].x | Tri[2].y | Tri[1].x | Tri[2].y ] < const
 		// |    -     |    -     |    -     |    -     |
 		// |  Point.x |  Point.y |  Point.x |  Point.y |
 		// |    *     |    *     |    *     |    *     |
-		// [ Tri[1].y | Tri[2].x | Tri[1].y | Tri[2].x ] < out of loop
+		// [ Tri[1].y | Tri[2].x | Tri[1].y | Tri[2].x ] < const
 		// |    +     |    +     |    +     |    +     |
-		// [  Det01   |  Det20   |  Det01   |  Det20   ] < out of loop
+		// [  Det01   |  Det20   |  Det01   |  Det20   ] < const
 		// |    V1    |    U1    |    V0    |    U0    |
 
 		// If I wanted to do 1 at a time though,
-		// I could utilize more lanes to do much
-		// more parallel calculations per clock
-		// |  Point.x |  Point.y |
-		// |    *     |    *     |
-		// | Tri[0].y | Tri[0].x ]
-		// |    -     |    -     |
-		// |  Point.y |  Point.x |
-		// |    *     |    *     |
-		// | Tri[0].x | Tri[0].y ]
-		// |    +     |    +     |
-		// |  Point.y |  Point.x |
-		// |    *     |    *     |
-		// | Tri[1].x | Tri[2].y ]
-		// |    -     |    -     |
-		// |  Point.x |  Point.y |
-		// |    *     |    *     |
-		// | Tri[1].y | Tri[2].x ]
-		// |    +     |    +     |
-		// |  Det01   |  Det20   ]
-		// |    V0    |    U0    |
+		// I could utilize more lanes to do
+		// independent calculations in parallel
+		// Such as the adds and multplications
 
+		// |  Point.x |  Point.y | xy
+		// |    *     |    *     |
+		// | Tri[0].y | Tri[0].x ] < const
+		// |    -     |    -     |
+		// |  Point.y |  Point.x | yx
+		// |    *     |    *     |
+		// | Tri[0].x | Tri[0].y ] < const
+		// |    +     |    +     |
+		// |  Point.y |  Point.x | yx
+		// |    *     |    *     |
+		// | Tri[1].x | Tri[2].y ] < const
+		// |    -     |    -     |
+		// |  Point.x |  Point.y | xy
+		// |    *     |    *     |
+		// | Tri[1].y | Tri[2].x ] < const
+		// |    +     |    +     |
+		// |  Det01   |  Det20   ] < const
+		// |    V     |    U     |
+		//
+		// V Utilizing all four lanes V
+		// !Four determinants at once!
 		// |  Point.y |  Point.x |  Point.x |  Point.y | yxxy
-		// |    *     |    *     |    *     |    *     |
-		// | Tri[1].x | Tri[0].y | Tri[2].y | Tri[0].x | < out of loop
-		// |    -     |    -     |    -     |    -     |
+		// |    *     |    *     |    *     |    *     | mul
+		// | Tri[1].x | Tri[0].y | Tri[2].y | Tri[0].x | < const
+		// |    -     |    -     |    -     |    -     | sub
 		// |  Point.x |  Point.y |  Point.y |  Point.x | xyyx
-		// |    *     |    *     |    *     |    *     |
-		// | Tri[1].y | Tri[0].x | Tri[2].x | Tri[0].y | < out of loop
-		// |         hadd        |         hadd        |
-		// |    +     |    +     |    +     |    +     |
-		// [  Det01   |  Det20   |  Det01   |  Det20   ] < out of loop
+		// |    *     |    *     |    *     |    *     | mul
+		// | Tri[1].y | Tri[0].x | Tri[2].x | Tri[0].y | < const
+		// |         hadd        |         hadd        | hadd
+		// |    +     |    +     |    +     |    +     | add
+		// [  Det01   |  Det20   |  Det01   |  Det20   ] < const
 		// |    V     |    U     |    V     |    U     |
+
 		__m128i VU = _mm_sub_epi32(
 			_mm_mullo_epi32(
 				PointYXXY,
@@ -244,35 +261,58 @@ void BarycentricMethod<0>(
 				ConstVec_1y0x2x0y //1y'0x'2x'0y
 			)
 		);
-
 		VU = _mm_add_epi32(
 			_mm_hadd_epi32(
 				VU, VU
 			),
 			Det0120
 		);
-
-		const auto AreaCheck = _mm_cmplt_epi32(
-			_mm_hadd_epi32(
-				VU, VU
+		// Area = (blah) + Det20 + Det01
+		// U + V < Area ; U + V <= Area - 1
+		// U + V - Area < 0
+		// const auto AreaCheck = _mm_cmplt_epi32(
+		// 	_mm_hadd_epi32(
+		// 		VU, VU
+		// 	),
+		// 	Area
+		// );
+		// -U = U + (- 2 * U )
+		//                |_mm_unpacklo_epi32(0,sign(VU,(-1,-1,-1,-1)))| ( little waste)
+		// hadd[  ( V,U,V,U)     |      (0,-V,0,-U)      ]
+		// |    V+U   |    U+V   |   -V     |   -U     |
+		const __m128i CheckValues = _mm_hadd_epi32(
+			_mm_unpacklo_epi32(
+				_mm_sign_epi32(
+					VU,
+					_mm_set_epi32(-1,-1,-1,-1)
+				),
+				_mm_setzero_si128()
 			),
-			Area
+			VU
 		);
+		// X <= Y;!( X > Y ); !( Y < X )
+		const __m128i CheckParallel = _mm_cmplt_epi32(
+			CheckConst,
+			CheckValues
+		);
+		const std::uint16_t Mask = ~_mm_movemask_epi8(CheckParallel);
+		Results[i] |= Mask == 0xFFFF;
+		// |    <=    |    <=    |   <=     |   <=     |
+		// | Area-1   | Area-1   |    0     |    0     | < const
 
-		// U >= 0 = !(U < 0)
-		const auto SignCheck = _mm_cmplt_epi32(
-			VU, _mm_setzero_si128()
-		);
-		const auto AreaSignCheck = _mm_andnot_si128(
-			SignCheck, AreaCheck
-		);
-		Results[i] |= _mm_movemask_epi8(
-			AreaSignCheck
-		) == 0xFFFF;
 		// U = (blah) + Det20; U >= 0; U >= -Det20; -U <= Det20
 		// V = (blah) + Det01; V >= 0; V >= -Det01; -V <= Det01
-		// U + V < Area ; U + V <= Area - 1
-		// Results[i] |= (U + V) < Area && U >= 0 && V >= 0;
+		// X >= 0 : !(X < 0)
+		// const auto SignCheck = _mm_cmplt_epi32(
+		// 	VU, _mm_setzero_si128()
+		// );
+
+		// const auto AreaSignCheck = _mm_andnot_si128(
+		// 	SignCheck, AreaCheck
+		// );
+		// Results[i] |= _mm_movemask_epi8(
+		// 	AreaSignCheck
+		// ) == 0xFFFF;
 	}
 }
 #endif
