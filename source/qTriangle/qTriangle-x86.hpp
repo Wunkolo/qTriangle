@@ -4,7 +4,7 @@
 template<std::uint8_t WidthExp2>
 inline void CrossProductMethod(
 	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
-	const Triangle& Tri
+	const qTri::Triangle& Tri
 );
 template<std::uint8_t WidthExp2>
 inline void BarycentricMethod(
@@ -14,22 +14,6 @@ inline void BarycentricMethod(
 
 #if defined(__SSE4_1__)
 
-inline __m128i DetSSE41(
-	const __m128i Mat2x2
-)
-{
-	//    Topx,    Topy, Bottomx, Bottomy
-	// Bottomy, Bottomx,    Topy, Topx,
-	const __m128i Product = _mm_mullo_epi32(
-		Mat2x2,
-		_mm_shuffle_epi32(
-			Mat2x2,
-			_MM_SHUFFLE(0,1,2,3)
-		)
-	);
-	return _mm_hsub_epi32(Product,Product);
-}
-
 // Serial
 template<>
 inline void CrossProductMethod<0>(
@@ -37,32 +21,110 @@ inline void CrossProductMethod<0>(
 	const Triangle& Tri
 )
 {
-	const glm::i32vec2 EdgeDir[3] = {
-		Tri[1] - Tri[0],
-		Tri[2] - Tri[1],
-		Tri[0] - Tri[2]
-	};
+	// [ Tri[1].y, Tri[1].x, Tri[0].y, Tri[0].x]
+	const __m128i Tri10 = _mm_loadu_si128(
+		reinterpret_cast<const __m128i*>(Tri.data())
+	);
+	// [ Tri[2].y, Tri[2].x, Tri[2].y, Tri[2].x]
+	const __m128i Tri22 = _mm_set1_epi64x(
+		*reinterpret_cast<const std::uint64_t*>(Tri.data() + 2)
+	);
+
+	// unpacklo(above)
+	// [ Tri[2].y, Tri[0].y, Tri[2].x, Tri[0].x]
+	// unpackhi(above)
+	// [ Tri[2].y, Tri[1].y, Tri[2].x, Tri[1].x]
+	const __m128i Tri20yyxx = _mm_unpacklo_epi32(
+		Tri10, Tri22
+	);
+	const __m128i Tri21yyxx = _mm_unpackhi_epi32(
+		Tri10, Tri22
+	);
+
+	// unpacklo(above)
+	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
+	// unpackhi(above)
+	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
+	const __m128i Tri2210x = _mm_unpacklo_epi32(
+		Tri20yyxx, Tri21yyxx
+	);
+	const __m128i Tri2210y = _mm_unpackhi_epi32(
+		Tri20yyxx, Tri21yyxx
+	);
+
+	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
+	// - 
+	// [ Tri[2].x, Tri[1].x, Tri[0].x, Tri[2].x]
+	//   ^ alignr_epi8([ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x],12)
+	const __m128i EdgeDirx = _mm_sub_epi32(
+		Tri2210x,
+		_mm_alignr_epi8(
+			Tri2210x,Tri2210x,
+			12
+		)
+	);
+	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
+	// - 
+	// [ Tri[2].y, Tri[1].y, Tri[0].y, Tri[2].y]
+	//   ^ alignr_epi8([ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y],12)
+	const __m128i EdgeDiry = _mm_sub_epi32(
+		Tri2210y,
+		_mm_alignr_epi8(
+			Tri2210y,Tri2210y,
+			12
+		)
+	);
 
 	for( std::size_t i = 0; i < Count; ++i )
 	{
-		const glm::i32vec2 PointDir[3] = {
-			Points[i] - Tri[0],
-			Points[i] - Tri[1],
-			Points[i] - Tri[2]
-		};
+		const __m128i CurPoint = _mm_loadl_epi64(
+			reinterpret_cast<const __m128i*>(&Points[i])
+		);
+		const __m128i CurPointx = _mm_shuffle_epi32(
+			CurPoint, 0b00'00'00'00
+		);
+		const __m128i CurPointy = _mm_shuffle_epi32(
+			CurPoint, 0b01'01'01'01
+		);
+		// PointDirx = Point[i].x - Tri2210x
+		// PointDiry = Point[i].y - Tri2210y
 
-		const glm::i32vec3 Crosses = glm::vec3(
-			Det( EdgeDir[0], PointDir[0] ),
-			Det( EdgeDir[1], PointDir[1] ),
-			Det( EdgeDir[2], PointDir[2] )
+		const __m128i PointDirx = _mm_sub_epi32(
+			CurPointx, Tri2210x
+		);
+		const __m128i PointDiry = _mm_sub_epi32(
+			CurPointy, Tri2210y
+		);
+		// |   --   |  EdgeDir[2].x |  EdgeDir[1].x |  EdgeDir[0].x | < EdgeDirX
+		//                     |    mul    |
+		// |   --   | PointDir[2].y | PointDir[1].y | PointDir[0].y | < PointDiry
+		//                     |    sub    |
+		// |   --   |  EdgeDir[2].y |  EdgeDir[1].y |  EdgeDir[0].y | < EdgeDiry
+		//                     |    mul    |
+		// |   --   | PointDir[2].x | PointDir[1].x | PointDir[0].x | < PointDirx
+
+		// We're only checking if the signs are >=0 so there is a lot of
+		// optimization that can be done, such as eliminating the subtraction
+		// in the determinant to just comparing the two products directly
+		// ex: a.x*b.y - a.y*b.x >= 0
+		//     a.x*b.y >= a.y*b.x
+		// DetHi = EdgeDirx * PointDiry
+		// DetLo = EdgeDiry * PointDirx
+		const __m128i DetHi = _mm_mullo_epi32(
+			EdgeDirx, PointDiry
+		);
+		const __m128i DetLo = _mm_mullo_epi32(
+			EdgeDiry, PointDirx
 		);
 
-		Results[i] |= glm::all(
-			glm::greaterThanEqual(
-				Crosses,
-				glm::i32vec3(0)
+		const std::uint16_t CheckMask = _mm_movemask_epi8(
+			_mm_cmplt_epi32(
+				DetHi, DetLo
 			)
-		);
+		) & 0x0'F'F'F;
+
+		// Check = DetHi >= DetLo = -(DetHi < DetLo)
+		Results[i] |= CheckMask == 0x0'0'0'0;
 	}
 }
 
@@ -79,11 +141,6 @@ inline void BarycentricMethod<0>(
 	// [ Tri[2].y, Tri[2].x, Tri[2].y, Tri[2].x]
 	const __m128i Tri22 = _mm_set1_epi64x(
 		*reinterpret_cast<const std::uint64_t*>(Tri.data() + 2)
-	);
-	// [ Tri[0].y, Tri[0].x, Tri[2].y, Tri[2].x]
-	const __m128i Tri02 = _mm_alignr_epi8(
-		Tri10, Tri22,
-		8
 	);
 	// [ Tri[2].y, Tri[2].x, Tri[1].y, Tri[1].x]
 	const __m128i Tri21 = _mm_alignr_epi8(
