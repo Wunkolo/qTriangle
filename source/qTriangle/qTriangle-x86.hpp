@@ -12,120 +12,6 @@ inline void BarycentricMethod(
 	const qTri::Triangle& Tri
 );
 
-#if defined(__AVX2__)
-template<>
-inline void CrossProductMethod<1>(
-	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
-	const Triangle& Tri
-)
-{
-	// [ Tri[1].y, Tri[1].x, Tri[0].y, Tri[0].x]
-	const __m128i Tri10 = _mm_loadu_si128(
-		reinterpret_cast<const __m128i*>(Tri.data())
-	);
-	// [ Tri[2].y, Tri[2].x, Tri[2].y, Tri[2].x]
-	const __m128i Tri22 = _mm_set1_epi64x(
-		*reinterpret_cast<const std::uint64_t*>(Tri.data() + 2)
-	);
-
-	// unpacklo(above)
-	// [ Tri[2].y, Tri[0].y, Tri[2].x, Tri[0].x]
-	// unpackhi(above)
-	// [ Tri[2].y, Tri[1].y, Tri[2].x, Tri[1].x]
-	const __m128i Tri20yyxx = _mm_unpacklo_epi32(
-		Tri10, Tri22
-	);
-	const __m128i Tri21yyxx = _mm_unpackhi_epi32(
-		Tri10, Tri22
-	);
-
-	// unpacklo(above)
-	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
-	// unpackhi(above)
-	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
-	const __m256i Tri2210x2x = _mm256_broadcastsi128_si256(
-		_mm_unpacklo_epi32(
-			Tri20yyxx, Tri21yyxx
-		)
-	);
-	const __m256i Tri2210x2y = _mm256_broadcastsi128_si256(
-			_mm_unpackhi_epi32(
-			Tri20yyxx, Tri21yyxx
-		)
-	);
-
-	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
-	// - 
-	// [ Tri[2].x, Tri[1].x, Tri[0].x, Tri[2].x]
-	//   ^ alignr_epi8([ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x],12)
-	const __m256i EdgeDirx2x =
-	_mm256_sub_epi32(
-			Tri2210x2x,
-			_mm256_alignr_epi8(
-				Tri2210x2x,Tri2210x2x,
-				12
-		)
-	);
-	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
-	// - 
-	// [ Tri[2].y, Tri[1].y, Tri[0].y, Tri[2].y]
-	//   ^ alignr_epi8([ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y],12)
-	const __m256i EdgeDirx2y =
-	_mm256_sub_epi32(
-			Tri2210x2y,
-			_mm256_alignr_epi8(
-				Tri2210x2y,Tri2210x2y,
-				12
-		)
-	);
-
-	for( std::size_t i = 0; i < Count; i += 2 )
-	{
-		const __m256i CurPointx2 = _mm256_permute4x64_epi64(
-			_mm256_castsi128_si256(
-				_mm_loadu_si128(
-					reinterpret_cast<const __m128i*>(&Points[i])
-				)
-			),
-			0b01'01'00'00
-		);
-		const __m256i CurPointx2x = _mm256_shuffle_epi32(
-			CurPointx2, 0b00'00'00'00
-		);
-		const __m256i CurPointx2y = _mm256_shuffle_epi32(
-			CurPointx2, 0b01'01'01'01
-		);
-
-		const __m256i PointDirx2x = _mm256_sub_epi32(
-			CurPointx2x, Tri2210x2x
-		);
-		const __m256i PointDirx2y = _mm256_sub_epi32(
-			CurPointx2y, Tri2210x2y
-		);
-		const __m256i DetHix2 = _mm256_mullo_epi32(
-			EdgeDirx2x, PointDirx2y
-		);
-		const __m256i DetLox2 = _mm256_mullo_epi32(
-			EdgeDirx2y, PointDirx2x
-		);
-		// Check = DetHi >= DetLo = -(DetHi < DetLo) = ~(DetLo > DetHi)
-		const std::uint32_t CheckMaskx2 = (~_mm256_movemask_epi8(
-			_mm256_cmpgt_epi32(
-				DetLox2, DetHix2
-			)
-		) & 0x0'F'F'F'0'F'F'F) + 0x0001'0001;
-
-		*reinterpret_cast<std::uint16_t*>(Results + i) |=
-			static_cast<std::uint16_t>(
-				0x0101'0100'0001'0000 >> (_pext_u32( CheckMaskx2, 0x1000'1000) * 16)
-			);
-		
-		// Results[i + 0] |= (CheckMaskx2 & 0x0000FFFF) == 0;
-		// Results[i + 1] |= (CheckMaskx2 & 0xFFFF0000) == 0;
-	}
-}
-#endif
-
 #if defined(__SSE4_1__)
 
 // Serial
@@ -241,6 +127,125 @@ inline void CrossProductMethod<0>(
 		Results[i] |= CheckMask == 0x0'0'0'0;
 	}
 }
+
+#if defined(__AVX2__)
+
+// Two at a time
+template<>
+inline void CrossProductMethod<1>(
+	const glm::i32vec2 Points[], std::uint8_t Results[], std::size_t Count,
+	const Triangle& Tri
+)
+{
+	// [ Tri[1].y, Tri[1].x, Tri[0].y, Tri[0].x]
+	const __m128i Tri10 = _mm_loadu_si128(
+		reinterpret_cast<const __m128i*>(Tri.data())
+	);
+	// [ Tri[2].y, Tri[2].x, Tri[2].y, Tri[2].x]
+	const __m128i Tri22 = _mm_set1_epi64x(
+		*reinterpret_cast<const std::uint64_t*>(Tri.data() + 2)
+	);
+
+	// unpacklo(above)
+	// [ Tri[2].y, Tri[0].y, Tri[2].x, Tri[0].x]
+	// unpackhi(above)
+	// [ Tri[2].y, Tri[1].y, Tri[2].x, Tri[1].x]
+	const __m128i Tri20yyxx = _mm_unpacklo_epi32(
+		Tri10, Tri22
+	);
+	const __m128i Tri21yyxx = _mm_unpackhi_epi32(
+		Tri10, Tri22
+	);
+
+	// unpacklo(above)
+	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
+	// unpackhi(above)
+	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
+	const __m256i Tri2210x2x = _mm256_broadcastsi128_si256(
+		_mm_unpacklo_epi32(
+			Tri20yyxx, Tri21yyxx
+		)
+	);
+	const __m256i Tri2210x2y = _mm256_broadcastsi128_si256(
+			_mm_unpackhi_epi32(
+			Tri20yyxx, Tri21yyxx
+		)
+	);
+
+	// [ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x]
+	// - 
+	// [ Tri[2].x, Tri[1].x, Tri[0].x, Tri[2].x]
+	//   ^ alignr_epi8([ Tri[2].x, Tri[2].x, Tri[1].x, Tri[0].x],12)
+	const __m256i EdgeDirx2x =
+	_mm256_sub_epi32(
+			Tri2210x2x,
+			_mm256_alignr_epi8(
+				Tri2210x2x,Tri2210x2x,
+				12
+		)
+	);
+	// [ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y]
+	// - 
+	// [ Tri[2].y, Tri[1].y, Tri[0].y, Tri[2].y]
+	//   ^ alignr_epi8([ Tri[2].y, Tri[2].y, Tri[1].y, Tri[0].y],12)
+	const __m256i EdgeDirx2y =
+	_mm256_sub_epi32(
+			Tri2210x2y,
+			_mm256_alignr_epi8(
+				Tri2210x2y,Tri2210x2y,
+				12
+		)
+	);
+
+	for( std::size_t i = 0; i < Count; i += 2 )
+	{
+		const __m256i CurPointx2 = _mm256_permute4x64_epi64(
+			_mm256_castsi128_si256(
+				_mm_loadu_si128(
+					reinterpret_cast<const __m128i*>(&Points[i])
+				)
+			),
+			0b01'01'00'00
+		);
+		const __m256i CurPointx2x = _mm256_shuffle_epi32(
+			CurPointx2, 0b00'00'00'00
+		);
+		const __m256i CurPointx2y = _mm256_shuffle_epi32(
+			CurPointx2, 0b01'01'01'01
+		);
+
+		const __m256i PointDirx2x = _mm256_sub_epi32(
+			CurPointx2x, Tri2210x2x
+		);
+		const __m256i PointDirx2y = _mm256_sub_epi32(
+			CurPointx2y, Tri2210x2y
+		);
+		const __m256i DetHix2 = _mm256_mullo_epi32(
+			EdgeDirx2x, PointDirx2y
+		);
+		const __m256i DetLox2 = _mm256_mullo_epi32(
+			EdgeDirx2y, PointDirx2x
+		);
+		// Check = DetHi >= DetLo = -(DetHi < DetLo) = ~(DetLo > DetHi)
+		const std::uint32_t CheckMaskx2 = (~_mm256_movemask_epi8(
+			_mm256_cmpgt_epi32(
+				DetLox2, DetHix2
+			)
+		) & 0x0'F'F'F'0'F'F'F) + 0x0001'0001;
+
+		*reinterpret_cast<std::uint16_t*>(Results + i) |=
+			static_cast<std::uint16_t>(
+				0x0101'0100'0001'0000 >> (_pext_u32( CheckMaskx2, 0x1000'1000) * 16)
+			);
+		
+		// Results[i + 0] |= (CheckMaskx2 & 0x0000FFFF) == 0;
+		// Results[i + 1] |= (CheckMaskx2 & 0xFFFF0000) == 0;
+	}
+	CrossProductMethod<0>(
+		Points, Results, Count, Tri
+	);
+}
+#endif
 
 template<>
 inline void BarycentricMethod<0>(
