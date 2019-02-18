@@ -124,7 +124,7 @@ Which results in the total overhead for each point being
 
 Subtractions|Multiplications|Comparisons
 :-:|:-:|:-:
-9|6|3
+3|6|3
 
 # Barycentric Coordinate Method
 
