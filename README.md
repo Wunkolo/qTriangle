@@ -8,6 +8,11 @@
 
 qTriangle is a persona study to design a **q**uick way to detect if a point is within a **Triangle** by means of vectorization
 
+[![](media/glsl.png)](https://www.shadertoy.com/view/4t3czN)
+
+
+### [Check out a live GLSL sample here!](https://www.shadertoy.com/view/4t3czN)
+
 The domain of the Point-In-Triangle problem is determining if a cartesian coordinate happens to land upon the interior of a triangle. In this case the 2D case of triangles will be examined and will require some kind of surface **area** for a point to land on so a case in which all three points are collinear(which is the worst case of having a *very* slim triangle) are ruled out.
 
 This problem comes up a lot in the domain of computer graphics and gameplay programming at times. Sometimes it's testing if a single point lands upon a polygon(made up of triangles) and sometimes it's testing if thousands of points happen to land on a triangle or not(such as when rendering a vector triangle against a regular grid during rasterization).
