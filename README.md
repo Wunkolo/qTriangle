@@ -6,19 +6,19 @@
 ||Serial|SSE/NEON|AVX2|AVX512
 ||![Serial](media/Serial.gif)|![SSE/NEON](media/SSE-NEON.gif)|![AVX2](media/AVX2.gif)|![AVX512](media/AVX512.gif)|
 
-qTriangle is a persona study to design a **q**uick way to rasterize **Triangle**s by optimizing the and vectorizing the Point-In-Triangle problem.
+qTriangle is a persona study to design a **q**uick way to detect if a point is within a **Triangle** by means of vectorization
 
 The domain of the Point-In-Triangle problem is determining if a cartesian coordinate happens to land upon the interior of a triangle. In this case the 2D case of triangles will be examined and will require some kind of surface **area** for a point to land on so a case in which all three points are collinear(which is the worst case of having a *very* slim triangle) are ruled out.
 
-This problem comes up a lot in the domain of computer graphics and game-play programming at times. Sometimes it's testing if a single point lands upon a polygon(made up of triangles) and sometimes it's testing if thousands of points happen to land on a triangle or not(such as when rendering a vector triangle against a regular grid during rasterization).
+This problem comes up a lot in the domain of computer graphics and gameplay programming at times. Sometimes it's testing if a single point lands upon a polygon(made up of triangles) and sometimes it's testing if thousands of points happen to land on a triangle or not(such as when rendering a vector triangle against a regular grid during rasterization).
 
-There are two primary formula to test if a point happens to land within a triangle in 2D space.
+There are several methods to test if a point happens to land within a triangle in 2D space, each have their own pros and cons and scaling properties.
 
 # Cross Product Method
 
 The cross-product operation in vector algebra is a binary operation that takes two vectors in 3D space and creates a new vector that is perpendicular to them both. You can think of the two vectors as describing some kind of plane in 2D space, and the cross product creates a new vector that is perpendicular to this plane. Though, there are two ways to create a vector perpendicular to a plane, by going "in" the plane and going "out" the plane.
 
-The Cross-Product has a lot of useful properties but one of interest at the moment is the **magnitude** of the resulting vector of the cross product which will be the **area** of the parallelogram that the two original vectors create. Since the points are on the X-Y plane in 3D space this *magnitude* will always be the Z-component of the cross product since all vectors perpendicular to the X-Y plane will take the form `[ 0, 0, (some value)]`. This becomes useful later on.
+The Cross-Product has a lot of useful properties but one of interest at the moment is the **magnitude** of the resulting vector of the cross product which will be the **area** of the parallelogram that the two original vectors create. Since the points are on the X-Y plane in 3D space this *magnitude* will always be the Z-component of the cross product since all vectors perpendicular to the orthogonal X-Y plane will take the form `[ 0, 0, (some value)]`. This becomes useful later on.
 
 ![](media/Cross.gif)
 
