@@ -1,5 +1,6 @@
 import os
-from subprocess import call
+import subprocess
+import multiprocessing
 import numpy as np
 import itertools
 from PIL import Image
@@ -58,85 +59,90 @@ def RenderTriangle( Params ):
 	Draw = ImageDraw.Draw(Img)
 	# Generate each row of points up-front
 	Points = [
-		[
-			(x,y) for x in range(Size[0]) if PointInTriangle((x,y),TestTriangle)
-		]
-		for y in range(Size[1])
+		(x,y) for y in range(Size[1]) for x in range(Size[0])
 	]
 	i = 0
-	for Row in Points:
-		for CurPoints in chunks(Row,Granularity):
-			# Hilight the pixels being currently processed
-			Draw.point(
-				CurPoints,
-				fill=(0xFF, 0x00, 0x00)
-			)
-			Img.resize(
-				(Img.width * Scale, Img.height * Scale),
-				Image.NEAREST
-			).save(Path + Name + '_' + str(i).zfill(6) + ".png")
-			i += 1
-			# Save the "processed" frame
-			Draw.point(
-				CurPoints,
-				fill=(0xFF, 0xFF, 0xFF)
-			)
-			Img.resize(
-				(Img.width * Scale, Img.height * Scale),
-				Image.NEAREST
-			).save(Path + Name + '_' + str(i).zfill(6) + ".png")
-			i += 1
-			
-	call(
+	for CurPoints in chunks(Points,Granularity):
+		# Hilight the pixels being currently processed
+		# Hilight hits and misses
+		Hit = [(x,y) for (x,y) in CurPoints if PointInTriangle((x,y),TestTriangle)]
+		Miss = [(x,y) for (x,y) in CurPoints if not PointInTriangle((x,y),TestTriangle)]
+		Draw.point(
+			Hit,
+			fill=(0x00, 0xFF, 0x00)
+		)
+		Draw.point(
+			Miss,
+			fill=(0xFF, 0x00, 0x00)
+		)
+		Img.resize(
+			(Img.width * Scale, Img.height * Scale),
+			Image.NEAREST
+		).save(Path + Name + '_' + str(i).zfill(6) + ".png")
+		i += 1
+		# Save the "processed" frame
+		Draw.point(
+			Hit,
+			fill=(0xFF, 0xFF, 0xFF)
+		)
+		Draw.point(
+			Miss,
+			fill=(0x00, 0x00, 0x00)
+		)
+		Img.resize(
+			(Img.width * Scale, Img.height * Scale),
+			Image.NEAREST
+		).save(Path + Name + '_' + str(i).zfill(6) + ".png")
+		i += 1
+	subprocess.Popen(
 		[
 			'ffmpeg',
+			'-y',
 			'-framerate','50',
-			'-i', Path + Name + '_%6d.png',
-			Name + '.gif',
-			'-t','4'
+			'-i', Path + Name + '_%06d.png',
+			Name + '.gif'
 		]
-	)
+	).wait()
 
-
+Configs = [
 # Serial
-RenderTriangle(
 	{
 		"Name": "Serial",
 		"Granularity": [1],
 		"Scale": 2,
 		"Size": (100, 100)
-	}
-)
-
+	},
 # SSE/NEON
-RenderTriangle(
 	{
 		"Name": "SSE-NEON",
 		"Granularity": [4,1],
 		"Scale": 2,
 		"Size": (100, 100)
-	}
-)
-
+	},
 # AVX2
-RenderTriangle(
 	{
 		"Name": "AVX2",
 		"Granularity": [8,4,1],
 		"Scale": 2,
 		"Size": (100, 100)
-	}
-)
-
+	},
 # AVX512
-RenderTriangle(
 	{
 		"Name": "AVX512",
 		"Granularity": [16,8,4,1],
 		"Scale": 2,
 		"Size": (100, 100)
 	}
-)
+]
 
-# ffmpeg -f image2 -framerate 50 -i Serial-%6d.png Serial.gif -t 4
+Processes = [
+	multiprocessing.Process(
+		target=RenderTriangle, args=(Config,)
+	) for Config in Configs
+]
 
+for Process in Processes:
+	Process.start()
+
+for Process in Processes:
+	Process.join()
