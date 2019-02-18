@@ -6,7 +6,7 @@
 ||Serial|SSE/NEON|AVX2|AVX512
 ||![Serial](media/Serial.gif)|![SSE/NEON](media/SSE-NEON.gif)|![AVX2](media/AVX2.gif)|![AVX512](media/AVX512.gif)|
 
-qTriangle is a personal study to design a **q**uick way to rasterize **Triangle**s by optimizing the and vectorizing the Point-In-Triangle problem.
+qTriangle is a persona study to design a **q**uick way to rasterize **Triangle**s by optimizing the and vectorizing the Point-In-Triangle problem.
 
 The domain of the Point-In-Triangle problem is determining if a cartesian coordinate happens to land upon the interior of a triangle. In this case the 2D case of triangles will be examined and will require some kind of surface **area** for a point to land on so a case in which all three points are collinear(which is the worst case of having a *very* slim triangle) are ruled out.
 
