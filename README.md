@@ -1,4 +1,4 @@
-# qTriangle [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Wunkolo/qTriangle/master/LICENSE)
+# qTriangle [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Wunkolo/qTriangle/master/LICENSE) (WIP)
 
 
 ||||||
