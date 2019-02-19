@@ -1,10 +1,9 @@
 # qTriangle [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Wunkolo/qTriangle/master/LICENSE) (WIP)
 
-
-||||||
-|:-:|:-:|:-:|:-:|:-:|
-||Serial|SSE/NEON|AVX2|AVX512
-||![Serial](media/Serial.gif)|![SSE/NEON](media/SSE-NEON.gif)|![AVX2](media/AVX2.gif)|![AVX512](media/AVX512.gif)|
+|||||
+|:-:|:-:|:-:|:-:|
+|Serial|SSE/NEON|AVX2|AVX512|
+|![Serial](media/Serial.gif)|![SSE/NEON](media/SSE-NEON.gif)|![AVX2](media/AVX2.gif)|![AVX512](media/AVX512.gif)|
 
 qTriangle is a personal study to design a **q**uick way to detect if a point is within a **Triangle** by means of vectorization
 
@@ -124,7 +123,7 @@ Which results in the total overhead for each point being
 
 Subtractions|Multiplications|Comparisons
 :-:|:-:|:-:
-3|6|3
+6|6|3
 
 # Barycentric Coordinate Method
 
